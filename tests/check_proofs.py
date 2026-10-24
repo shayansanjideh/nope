@@ -17,7 +17,8 @@ LEAN = ROOT / "lean"
 ALLOWED = {"propext", "Quot.sound", "Classical.choice"}
 REQUIRED = ["soundness", "soundness_executed", "conf_between", "integrity", "integrity_executed",
             "integrity_between", "precision", "monitor_exact", "call_monotone",
-            "downgrade_only_by_approval", "run_calls_monotone", "policy_monotone", "check_iff"]
+            "downgrade_only_by_approval", "run_calls_monotone", "policy_monotone", "check_iff",
+            "NI.noninterference", "NI.noninterference_conf", "NI.noninterference_integ"]
 
 
 def main() -> int:

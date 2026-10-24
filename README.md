@@ -35,7 +35,7 @@ Python handles I/O only (MCP, process plumbing, logs). There is no policy logic 
 
 ## What is proven
 
-All proofs are in [`lean/Nope/Theorems.lean`](lean/Nope/Theorems.lean). Lean 4.35, core + `Std` only (no Mathlib), zero `sorry`, zero `admit`, no custom axioms. The axiom audit ([`lean/Axioms.lean`](lean/Axioms.lean), output committed in [`lean/axioms-output.txt`](lean/axioms-output.txt)) shows every theorem depends only on a subset of `{propext, Quot.sound, Classical.choice}`.
+Proofs are in [`lean/Nope/Theorems.lean`](lean/Nope/Theorems.lean) and [`lean/Nope/Noninterference.lean`](lean/Nope/Noninterference.lean). Lean 4.35, core + `Std` only (no Mathlib), zero `sorry`, zero `admit`, no custom axioms. The axiom audit ([`lean/Axioms.lean`](lean/Axioms.lean), output committed in [`lean/axioms-output.txt`](lean/axioms-output.txt)) shows every theorem depends only on a subset of `{propext, Quot.sound, Classical.choice}`.
 
 **The spec is independent of the monitor.** [`Spec.lean`](lean/Nope/Spec.lean) never mentions `Monitor.step`. For the call at position `i` of a trace, it scans the history backwards and joins the labels of everything read since the last relevant approval: `confSince` stops at the most recent `declassify`, and `integSince` stops at the most recent `endorse`. `step` is a forward fold over a running label. The theorems relate the two, so the soundness proof is not circular.
 
@@ -120,7 +120,31 @@ theorem policy_monotone {P' : Manifest} (hs : Manifest.AtLeastAsStrict P' P)
 
 Tightening a manifest only ever removes behaviors: anything allowed under the stricter manifest is allowed under the looser one. You can tighten labels without fear of a strange interaction enabling something new.
 
-### 6. Decidable spec and lattice laws
+### 6–7. Noninterference (end to end, over data)
+
+Theorems 1–5 relate the monitor to a spec over labels. [`Noninterference.lean`](lean/Nope/Noninterference.lean) proves what those labels buy, stated over the data itself. An **agent** is any function from everything it has observed (every tool, argument, result or denial) to its next call, with no assumptions, so it can be fully attacker-controlled. A **world** fixes what every tool returns. An **observer** watching a set of sinks sees the tool and argument of every call that reaches one.
+
+```lean
+theorem noninterference_conf (o : Conf) (W₁ W₂ : World D)
+    (hW : ∀ i t tool a, P t = some tool → tool.outLabel.conf ≤ o → W₁ i t a = W₂ i t a)
+    (A : Agent D) (n : Nat) (s : State) :
+    view P (lowSink o) (exec P W₁ A n s []).1 = view P (lowSink o) (exec P W₂ A n s []).1
+
+theorem noninterference_integ (W₁ W₂ : World D)
+    (hW : ∀ i t tool a, P t = some tool → tool.outLabel.integ = .trusted → W₁ i t a = W₂ i t a)
+    (A : Agent D) (n : Nat) (s : State) :
+    view P protectedSink (exec P W₁ A n s []).1 = view P protectedSink (exec P W₂ A n s []).1
+```
+
+**Confidentiality.** Run any agent in two worlds that differ only in results above level `o` (for example, the contents of `secrets.env`). Every call that reaches a sink cleared for `o` is identical in both runs, tool for tool and argument for argument. Secret data cannot reach a public sink or influence what reaches one, whatever the model does.
+
+**Integrity.** Run any agent in two worlds that differ only in untrusted results (for example, what an injected web page says). Every call that reaches a `requiresTrusted` tool is identical in both runs. Injected content cannot choose which protected action runs or with what arguments.
+
+Both are instances of one generic theorem (`NI.noninterference`) about any barrier: reading high data blocks the session, blocking persists, and a blocked session cannot reach the observed sinks. Kernel-evaluated examples at the end of the file run an exfiltrating agent and an injected agent on the demo manifest, and also show that benign runs do reach the sinks.
+
+Scope: runs consist of agent calls. Human approvals are the explicit, logged release valve and sit outside these theorems. A world's results depend on the step, tool and argument, so a tool whose results depend on earlier writes must be labeled to match (see the storage-laundering note in the TCB). The observer sees only calls that reach its sinks, so covert channels like timing and attempt counts are out of scope.
+
+### 8. Decidable spec and lattice laws
 
 `check_iff : check P l0 tr = true ↔ Spec P l0 tr` proves the Bool checker equals the Prop spec. The checker re-derives each position's history independently and is compiled into `nope-speccheck`, the oracle for the differential tests. `Conf`, `Integ` and `Label` are proven join-semilattices (`le_refl`, `le_trans`, `le_antisymm`, `le_sup_left`, `le_sup_right`, `sup_le`). [`Examples.lean`](lean/Nope/Examples.lean) evaluates the demo scenarios in the kernel with `decide`.
 
@@ -152,7 +176,7 @@ Tightening a manifest only ever removes behaviors: anything allowed under the st
 | check | result |
 |---|---|
 | `lake build` | clean, no warnings |
-| proof hygiene ([`tests/check_proofs.py`](tests/check_proofs.py)) | no `sorry`/`admit`/`axiom`; audit matches committed output |
+| proof hygiene ([`tests/check_proofs.py`](tests/check_proofs.py)), including noninterference | no `sorry`/`admit`/`axiom`; audit matches committed output |
 | differential, engine tier | **12,000 random sessions, 237,697 events, 240 random manifests: 12,000/12,000 agree** |
 | oracle mutation self-test | 500/500 single flipped verdicts or corrupted states caught |
 | differential, MCP tier | **200 sessions, 4,154 events through `nope serve`: 0 spec disagreements, 0 denied calls reached the downstream, all 200 audit logs replay identically** |
@@ -278,7 +302,7 @@ References:
 ## Repo layout
 
 ```
-lean/        Lean project: Labels, Monitor, Spec, Theorems, Examples, Json, Engine, SpecCheck, Axioms
+lean/        Lean project: Labels, Monitor, Spec, Theorems, Noninterference, Examples, Json, Engine, SpecCheck, Axioms
 proxy/       Python MCP proxy + CLI (serve, approve, status, sessions, init-manifest, audit-check)
 manifests/   demo.json: labels for the demo servers
 demo/        attacker server, sandbox generator, scripted adversarial agent, scenario runner

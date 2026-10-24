@@ -29,3 +29,6 @@
 'Nope.run_calls_monotone' depends on axioms: [propext, Classical.choice, Quot.sound]
 'Nope.policy_monotone' depends on axioms: [propext, Classical.choice, Quot.sound]
 'Nope.check_iff' depends on axioms: [propext, Quot.sound]
+'Nope.NI.noninterference' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Nope.NI.noninterference_conf' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Nope.NI.noninterference_integ' depends on axioms: [propext, Classical.choice, Quot.sound]

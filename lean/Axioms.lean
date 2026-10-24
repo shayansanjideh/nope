@@ -39,3 +39,7 @@ open Nope
 #print axioms policy_monotone
 -- Decidable spec
 #print axioms check_iff
+-- 6-7. Noninterference
+#print axioms NI.noninterference
+#print axioms NI.noninterference_conf
+#print axioms NI.noninterference_integ
