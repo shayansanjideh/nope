@@ -19,6 +19,7 @@ back as trusted.
 from __future__ import annotations
 
 import fcntl
+import functools
 import fnmatch
 import json
 import os
@@ -150,23 +151,51 @@ SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "bu
              ".next", ".cache", ".lake"}
 
 
+@functools.lru_cache(maxsize=None)
 def _x(p: str) -> Path:
     return Path(os.path.expanduser(p)).resolve()
 
 
 def _under(p: Path, roots: list[str]) -> bool:
+    s = str(p)
     for r in roots:
-        rr = _x(r)
-        if p == rr or rr in p.parents:
+        rr = str(_x(r))
+        if s == rr or s.startswith(rr.rstrip(os.sep) + os.sep):
             return True
     return False
 
 
+_SECRET_NAME_RX = re.compile("|".join(fnmatch.translate(p) for p in SECRET_NAMES))
+_NOT_SECRET_RX = re.compile("|".join(fnmatch.translate(p) for p in NOT_SECRET))
+
+
 def is_secret_path(p: Path) -> bool:
     name = p.name
-    if any(fnmatch.fnmatch(name, pat) for pat in NOT_SECRET):
+    if _NOT_SECRET_RX.match(name):
         return False
-    return any(fnmatch.fnmatch(name, pat) for pat in SECRET_NAMES) or _under(p, SECRET_DIRS)
+    return bool(_SECRET_NAME_RX.match(name)) or _under(p, SECRET_DIRS)
+
+
+def sensitive_files(root: Path) -> list[Path]:
+    """Files under root whose path marks them secret or personal. Cached for 30 seconds
+    per directory (paths only, never contents), so large trees are not rescanned on
+    every tool call."""
+    import hashlib
+    import time
+    cache = CC_DIR / "cache" / (hashlib.sha256(str(root).encode()).hexdigest()[:24] + ".json")
+    try:
+        c = json.loads(cache.read_text())
+        if time.time() - c["t"] < 30:
+            return [Path(f) for f in c["files"]]
+    except (OSError, json.JSONDecodeError, KeyError):
+        pass
+    files = [f for f in _walk(root) if path_conf(f) != "public"]
+    try:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps({"t": time.time(), "files": [str(f) for f in files]}))
+    except OSError:
+        pass
+    return files
 
 
 def is_nope_config(p: Path) -> bool:
@@ -242,8 +271,11 @@ def grep_label(inp: dict, cwd: str, registry: dict) -> tuple[str, str]:
         rx = None  # cannot tell what it matches: assume it matches
     lab = ("public", "trusted")
     labeled = {Path(k) for k in registry}
-    for f in _walk(root):
-        cand = file_label(f, registry) if (path_conf(f) != "public" or f in labeled) else None
+    rs = str(root)
+    scope = sensitive_files(root) + [f for f in labeled
+                                    if str(f) == rs or str(f).startswith(rs.rstrip(os.sep) + os.sep)]
+    for f in scope:
+        cand = file_label(f, registry)
         if not cand or cand == ("public", "trusted"):
             continue
         try:
@@ -534,7 +566,7 @@ def sensitive_values(cwd: str, registry: dict) -> dict[str, set[str]]:
     """Known secret and personal values on this machine, by confidentiality level.
     Kept in memory only; never written to disk or logs."""
     secret: set[str] = set()
-    files = [f for f in _walk(Path(cwd), limit=20000) if is_secret_path(f)]
+    files = [f for f in sensitive_files(Path(cwd)) if is_secret_path(f)]
     files += [_x(p) for p in HOME_SECRET_FILES]
     ssh = _x("~/.ssh")
     if ssh.is_dir():

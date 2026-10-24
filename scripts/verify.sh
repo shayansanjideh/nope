@@ -23,6 +23,7 @@ step "proof hygiene"     $PY tests/check_proofs.py .verify-build.log
 step "claude code hook"   $PY tests/test_claude_code.py
 step "bash red team"      bash -c "$PY tests/redteam_bash.py | tail -1; exit \${PIPESTATUS[0]}"
 if [ -z "${QUICK:-}" ]; then
+  step "hook fuzzing"    bash -c "$PY tests/fuzz_hook.py | tail -1; exit \${PIPESTATUS[0]}"
   step "attacker port"   attacker_port_free
   step "demo scenarios"  bash -c 'set -o pipefail; cd demo && ../.venv/bin/python run_demo.py 2>/dev/null | tail -9'
   step "audit replay"    bash -c '.venv/bin/nope audit-check demo/run/logs/*.jsonl docs/evidence/*.jsonl'

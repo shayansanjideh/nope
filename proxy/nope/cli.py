@@ -14,7 +14,6 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 import getpass
 import json
 import os
@@ -24,7 +23,6 @@ import sys
 import time
 from pathlib import Path
 
-from . import control
 from .config import SEP, ConfigError, check_session_id, load_config, load_manifest_json
 from .logreplay import read_records, speccheck_input
 
@@ -34,6 +32,8 @@ def _cfg(args):
 
 
 def cmd_serve(args) -> int:
+    import asyncio  # noqa: F401  (lazy: keeps the hook fast)
+    from . import control  # noqa: F401
     from .server import serve_stdio
     cfg = _cfg(args)
     session = check_session_id(
@@ -52,6 +52,8 @@ def _cc_session(args):
 
 
 def cmd_approve(args) -> int:
+    import asyncio  # noqa: F401  (lazy: keeps the hook fast)
+    from . import control  # noqa: F401
     check_session_id(args.session)
     if args.action == "endorse":
         event = {"type": "endorse"}
@@ -78,6 +80,8 @@ def cmd_approve(args) -> int:
 
 
 def cmd_status(args) -> int:
+    import asyncio  # noqa: F401  (lazy: keeps the hook fast)
+    from . import control  # noqa: F401
     cc = _cc_session(args)
     if cc:
         print(json.dumps({"session": args.session, "state": cc.state(), "log": str(cc.log)},
@@ -91,6 +95,8 @@ def cmd_status(args) -> int:
 
 
 def cmd_sessions(args) -> int:
+    import asyncio  # noqa: F401  (lazy: keeps the hook fast)
+    from . import control  # noqa: F401
     cfg = _cfg(args)
     socks = sorted(cfg.socket_dir.glob("*.sock")) if cfg.socket_dir.exists() else []
     live = [s.stem for s in socks if control._alive(s)]
@@ -102,6 +108,8 @@ def cmd_sessions(args) -> int:
 
 
 def cmd_init_manifest(args) -> int:
+    import asyncio  # noqa: F401  (lazy: keeps the hook fast)
+    from . import control  # noqa: F401
     """Print manifest entries for downstream tools the manifest does not declare yet,
     using the most restrictive defaults. Review and relax them by hand."""
     from mcp import Client
