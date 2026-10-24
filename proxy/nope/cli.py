@@ -144,15 +144,26 @@ def cmd_hook(args) -> int:
 
 
 def cmd_setup(args) -> int:
-    from .claude_code import setup
+    from .claude_code import APPARMOR_FIX, apparmor_blocks_sandbox, sandbox_missing, setup
     path = Path(args.settings or "~/.claude/settings.json").expanduser()
-    cmd = setup(path, remove=args.remove)
+    cmd = setup(path, remove=args.remove, sandbox=not args.no_sandbox)
     if args.remove:
-        print(f"Removed the Nope hook from {path}")
-    else:
-        print(f"Installed the Nope hook in {path}\n  runs: {cmd}\n"
-              "Every Claude Code tool call (built-in and MCP) is now checked by Nope.\n"
-              "Start a new Claude Code session for it to take effect.")
+        print(f"Removed the Nope hook from {path} (sandbox settings left as they are; "
+              "change them with /sandbox in Claude Code).")
+        return 0
+    print(f"Nope is on. Every Claude Code tool call is now checked (settings: {path}).")
+    if not args.no_sandbox:
+        print("Shell commands now run in Claude Code's sandbox and can only reach package "
+              "registries and GitHub.\nAdd hosts under sandbox.network.allowedDomains in that file.")
+        missing = sandbox_missing()
+        if missing:
+            print(f"\nThe sandbox needs {' and '.join(missing)} on Linux. Install with:\n"
+                  "  sudo apt-get install bubblewrap socat    (Fedora: sudo dnf install ...)\n"
+                  "Claude Code will refuse to start until they are installed.")
+        if apparmor_blocks_sandbox():
+            print("\nThis Linux (Ubuntu 24.04+) blocks the sandbox until bubblewrap may create "
+                  "user namespaces. Allow just bubblewrap with:\n" + APPARMOR_FIX)
+    print("Start a new Claude Code session for this to take effect.")
     return 0
 
 
@@ -237,6 +248,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--settings", help="settings file (default ~/.claude/settings.json; "
                                       "use .claude/settings.json for one project)")
     p.add_argument("--remove", action="store_true", help="uninstall the hook")
+    p.add_argument("--no-sandbox", action="store_true",
+                   help="do not turn on Claude Code's shell sandbox (weaker: one shell command "
+                        "could read and send data by itself)")
     p.set_defaults(fn=cmd_setup)
 
     p = sub.add_parser("trust", help="forget remembered secret/untrusted labels on files")

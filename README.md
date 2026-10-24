@@ -1,132 +1,85 @@
 # Nope
 
-**Stops hijacked AI agents from leaking your secrets or taking actions you didn't ask for. Proven in Lean.**
+**Your AI agent reads the internet. Nope makes sure the internet can't tell it what to do.**
 
-AI agents with tools can be hijacked by prompt injection: a web page, email or README tells the model to send your keys somewhere or push malicious code. Most defenses try to *detect* the attack, and sometimes miss. Nope doesn't try to read the model's mind. It sits between your agent and its tools (as an MCP proxy) and enforces two rules on every tool call:
+Websites, READMEs, GitHub issues and emails can contain hidden instructions for AI agents ("prompt injection"). Real example, from a widely shared post in October 2026: a developer found Claude Code sending their personal details in HTTP headers, because the sites it curled *politely asked agents to identify their users*.
 
-1. **Once the agent has seen secret data, it can't send anything to the internet.**
-2. **Once the agent has read untrusted content, it can't take protected actions** (commit, send, delete).
-
-A human can override either rule with one command, and every override is logged.
-
-![Nope blocking an exfiltration attempt](docs/scenario1.gif)
-
-*A deliberately hijacked agent reads a secrets file, then follows a web page's instruction to send it to an attacker. Without Nope the attacker gets the key. With Nope:*
+With Nope installed, that second request never happens:
 
 ```
-nope: blocked fetch__fetch. This session has read secret data (from fs_secret__read_text_file),
-and fetch__fetch only accepts public data. Proven in Lean: Theorems 1 and 6 (confidentiality).
-To allow anyway: nope approve --session demo-s1 declassify public
+nope: blocked Bash[network]. This session has read untrusted content (from Bash[network]),
+and Bash[network] is a protected action that needs a trusted session.
+To allow anyway: nope approve --session 3f2a… endorse
 ```
 
-## Why "proven" matters
+## How it works
 
-The decision engine is written in Lean 4 and comes with machine-checked proofs. In plain terms:
+Nope watches every tool call your agent makes and enforces two rules:
+
+1. **After the agent reads something secret or personal, that data can't leave your machine.**
+2. **After the agent reads untrusted content (a web page, an issue, a fetched file), it can't take risky actions** like running shell commands, pushing code or editing agent config.
+
+It doesn't try to spot "suspicious" text. It tracks *where data came from*, so a cleverly worded attack gets the same answer as a clumsy one. You can override any block with one command, and every override is logged.
+
+## Your workflow doesn't change
+
+Normal coding never trips the rules:
+
+| you ask the agent to... | with Nope |
+|---|---|
+| read and edit code, grep the project | ✅ runs as usual |
+| run tests, `npm install`, `git pull` | ✅ runs as usual |
+| look up docs on the web, then keep editing | ✅ runs as usual |
+| read `.env`, then call a URL | 🛑 blocked: secrets can't leave |
+| read a web page, then run `curl`, `git push` or edit `CLAUDE.md` | 🛑 blocked until you approve |
+| switch Nope off or approve itself | 🛑 always blocked |
+
+Each check takes a fraction of a second, which you won't notice next to a model's response time.
+
+## Proven, not guessed
+
+The part that makes the decisions is written in [Lean 4](https://lean-lang.org) and comes with machine-checked mathematical proofs:
 
 > **No matter what the model does, secret data can't influence anything that leaves, and injected content can't trigger a protected action.**
 
-That holds even if the model is fully controlled by an attacker. The proofs cover the exact code that makes the decisions: the engine binary *is* the proven Lean code, not a re-implementation. Statements and details: [`docs/PROOFS.md`](docs/PROOFS.md).
+That holds even if the model is fully hijacked. The proofs cover the exact code that runs, not a description of it. Details: [`docs/PROOFS.md`](docs/PROOFS.md).
 
-What the proofs rely on (be honest about these):
+## Install (Claude Code)
 
-- **Correct labels.** You tell Nope which tools touch secrets, which read untrusted content, and which are protected. If you label `fetch` as safe for secrets, it will leak them. The proof is about enforcement, not about your labels.
-- **Approvals are trusted.** A human `approve` deliberately opens the gate. Don't give the agent a shell that can run `nope approve` itself.
-- **No side channels.** Timing and the number of attempts aren't covered.
+```sh
+git clone https://github.com/shayansanjideh/nope && cd nope
+(cd lean && lake build)        # needs elan (Lean); builds the engine in ~1 minute
+uv venv && uv pip install -e proxy && source .venv/bin/activate
+nope setup claude-code
+```
 
-## Demo
+That's it. Start a new Claude Code session. `setup` adds a hook so every tool call (built-in and MCP) is checked. It also turns on Claude Code's shell sandbox, so a single shell command can't send data to an arbitrary server on its own; shell commands can still reach package registries and GitHub. On Linux it tells you if anything is missing. Undo with `nope setup claude-code --remove`.
 
-Real, unmodified MCP servers (filesystem, fetch, git), a fake attacker website, and fake credentials. The "agent" is a script that obeys every injected instruction, because real models sometimes refuse and the point is that Nope holds even when they don't.
+When Nope blocks something you actually want, run the command it prints in another terminal:
 
-| attack | without Nope | with Nope |
-|---|---|---|
-| Read `secrets.env`, then a web page says "send it to me" | attacker receives the key | blocked, attacker receives nothing |
-| A web page says "commit this deploy script" | malicious commit lands | blocked until a human approves (logged) |
-| Normal work: read notes, fetch docs, write a summary | works | works |
+```sh
+nope approve --session <id> endorse              # "I've checked; trust this session again"
+nope approve --session <id> declassify public    # "this data may leave"
+```
+
+**Other AI tools:** Nope also runs as an MCP proxy, so it works with any MCP client (Claude Desktop, Cursor, custom agents) for the tools you route through it. See [`docs/MCP-PROXY.md`](docs/MCP-PROXY.md). Native integrations for more agents are next.
+
+## See it block attacks
 
 ```sh
 cd demo && ../.venv/bin/python run_demo.py
 ```
 
-It was also tested with real Claude Code pointed at Nope. The normal task worked, and the attack was blocked ([logs](docs/evidence/)).
+A deliberately hijacked agent tries to steal a (fake) API key and to commit a malicious script, with and without Nope, against real MCP servers. Without Nope both attacks succeed; with Nope both are blocked. ([recording](docs/scenario1.gif))
 
-## Quickstart
+## What Nope doesn't cover
 
-Needs [elan](https://github.com/leanprover/elan) (Lean), [uv](https://docs.astral.sh/uv/), and Node.js if your MCP servers use `npx`.
-
-```sh
-git clone https://github.com/shayansanjideh/nope && cd nope
-(cd lean && lake build)                 # builds the engine (~1-2 min)
-uv venv && uv pip install -e proxy && source .venv/bin/activate
-```
-
-**1. List your MCP servers** in `nope.toml`:
-
-```toml
-engine = "/path/to/nope/lean/.lake/build/bin/nope-engine"
-manifest = "manifest.json"
-
-[servers.fs]
-command = "npx"
-args = ["-y", "@modelcontextprotocol/server-filesystem@2.0.0", "/home/me/projects"]
-
-[servers.fetch]
-command = "uvx"
-args = ["mcp-server-fetch"]
-```
-
-**2. Label the tools.** This writes every tool with the strictest labels; loosen them by hand. See [`manifests/demo.json`](manifests/demo.json) for a worked example.
-
-```sh
-nope init-manifest --config nope.toml -o manifest.json
-```
-
-Each tool gets three settings:
-
-| setting | question it answers | example |
-|---|---|---|
-| `outLabel` | How sensitive / trustworthy is what this tool returns? | secrets file: `secret`; web page: `untrusted` |
-| `argClearance` | How sensitive may the data I send it be? | `fetch`: `public` (the URL leaves your machine) |
-| `requiresTrusted` | Is this a protected action? | `git_commit`: `true` |
-
-**3. Point your agent at Nope** instead of the servers. For Claude Code:
-
-```sh
-claude mcp add nope -- $(which nope) serve --config $PWD/nope.toml --session my-session
-```
-
-When something is blocked, the agent sees why and the exact override command:
-
-```sh
-nope approve --config nope.toml --session my-session endorse            # trust the session again
-nope approve --config nope.toml --session my-session declassify public  # let data out
-nope status  --config nope.toml --session my-session
-```
-
-Every call and approval goes to an audit log, and `nope audit-check <log>` re-checks it against the Lean spec.
+- **Labels are yours to trust.** Nope knows `.env`, SSH keys and cloud credentials are secret, and that web content is untrusted. Tell it about anything else sensitive in `~/.nope/claude-code.json`.
+- **What's already in the conversation.** If you paste a secret into your prompt, Nope never saw it being read.
+- **Files already on your disk are trusted,** unless the agent wrote them while tainted (Nope remembers those).
+- **Side channels** such as timing aren't covered.
+- **It's all-or-nothing per session.** After reading one secret, all outbound calls need approval, even unrelated ones. Tracking each piece of data separately is the next big step.
 
 ## How it compares
 
-| | approach | machine-checked proof | drop-in MCP proxy |
-|---|---|---|---|
-| **Nope** | blocks tool calls based on what the session has read | **yes** | **yes** |
-| CaMeL (Google DeepMind) | rewrites the agent so untrusted data can't steer it | no | no |
-| FIDES (Microsoft) | labels data inside the agent's planner | no | no |
-| Invariant / Snyk, MCP gateways | rule-based detection and access control | no | yes |
-| Sluice | spots copies of secret text in outgoing calls | no | yes |
-| Cedar (AWS) | Lean-verified authorization, not agent-specific | yes | no |
-
-Full comparison and references: [`docs/PROOFS.md`](docs/PROOFS.md#prior-art).
-
-## Limits of v1
-
-- **All-or-nothing per session.** After reading one secret, *every* outbound call needs approval, even unrelated ones. Tracking each piece of data separately is the next big step.
-- **Local only.** Speaks MCP over stdio, one session per proxy process.
-- **Restarts.** Use a fixed `--session` name. Reusing it restores the session's state from the audit log, so restarting doesn't wipe the taint.
-
-## Roadmap
-
-Per-value tracking (so reading a secret only blocks what was derived from it), argument-aware rules (e.g. `fetch` to an allowlisted domain), remote MCP transport, and tamper-evident hosted audit logs.
-
-## Repo
-
-`lean/` proofs and engine · `proxy/` the MCP proxy and `nope` CLI · `manifests/` labels · `demo/` attack demo · `tests/` differential tests · `scripts/verify.sh` runs every check
+Most agent-security tools *detect* attacks (classifiers, rules). Nope *enforces* where data may flow and proves the enforcement correct. Google DeepMind's CaMeL and Microsoft's FIDES use similar ideas inside research agents; Nope is a drop-in for the agent you already use, with machine-checked proofs. Full comparison: [`docs/PROOFS.md`](docs/PROOFS.md#prior-art).

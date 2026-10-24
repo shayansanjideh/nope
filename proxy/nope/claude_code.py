@@ -57,6 +57,12 @@ def variant(base: str, conf: str, integ: str) -> str:
     return f"{base}[{','.join(tags)}]" if tags else base
 
 
+def bash_variant(conf: str, integ: str) -> str:
+    tags = [t for t in ("" if conf == "public" else conf,
+                        "network" if integ == "untrusted" else "") if t]
+    return f"Bash[{','.join(tags)}]" if tags else "Bash"
+
+
 def profile_manifest() -> dict:
     """Labels for Claude Code's tools. Reading is local (clearance secret) and taints
     with the label of what was read. Bash can reach the network and change anything, so
@@ -64,7 +70,7 @@ def profile_manifest() -> dict:
     untrusted content and public sinks."""
     tools: dict[str, dict] = {}
     for base in ("Read", "Grep", "NotebookRead"):
-        for c in ("public", "secret"):
+        for c in CONFS:
             for i in INTEGS:
                 tools[variant(base, c, i)] = L(c, i, "secret", False)
     for base in ("Glob", "LS"):
@@ -73,12 +79,9 @@ def profile_manifest() -> dict:
         tools[base] = L("public", "trusted", "secret", False, "local file write")
         tools[f"{base}[agent-config]"] = L("public", "trusted", "secret", True,
                                            "writes instructions or config the agent loads")
-    for c in ("public", "secret"):
+    for c in CONFS:
         for i in INTEGS:
-            name = "Bash" + ({("public", "trusted"): "", ("secret", "trusted"): "[secret]",
-                              ("public", "untrusted"): "[network]",
-                              ("secret", "untrusted"): "[secret,network]"}[(c, i)])
-            tools[name] = L(c, i, "public", True, "shell: can reach the network")
+            tools[bash_variant(c, i)] = L(c, i, "public", True, "shell: can reach the network")
     for base in ("WebFetch", "WebSearch"):
         tools[base] = L("public", "untrusted", "public", False, "web: untrusted source, public sink")
     for base in ("Agent", "Task", "TodoWrite", "ToolSearch", "AskUserQuestion", "ExitPlanMode",
@@ -112,6 +115,10 @@ SECRET_NAMES = [".env", ".env.*", "*.pem", "*.key", "id_rsa*", "id_ed25519*", "i
 NOT_SECRET = [".env.example", ".env.sample", ".env.template", ".env.dist", "*.pub"]
 SECRET_DIRS = ["~/.ssh", "~/.aws", "~/.gnupg", "~/.config/gh", "~/.docker", "~/.kube",
                "~/.config/gcloud", "~/.azure", "~/.password-store", "~/.nope"]
+# Personal identity (name, email, host). Labeled "internal": fine to use locally, but it
+# may not leave through a public sink such as a web request.
+PERSONAL_PATHS = ["~/.gitconfig", "~/.config/git/config", "~/.claude.json"]
+
 NOPE_CONFIG = ["~/.nope", "~/.claude/settings.json", "~/.claude/settings.local.json",
                "~/.claude.json"]
 AGENT_CONFIG_NAMES = ["CLAUDE.md", "CLAUDE.local.md", "AGENTS.md", ".mcp.json", ".bashrc",
@@ -161,8 +168,16 @@ def load_registry() -> dict[str, dict]:
         return {}
 
 
+def path_conf(p: Path) -> str:
+    if is_secret_path(p):
+        return "secret"
+    if _under(p, PERSONAL_PATHS):
+        return "internal"
+    return "public"
+
+
 def file_label(p: Path, registry: dict) -> tuple[str, str]:
-    lab = ("secret" if is_secret_path(p) else "public", "trusted")
+    lab = (path_conf(p), "trusted")
     r = registry.get(str(p))
     if r:
         lab = _join(lab, (r["conf"], r["integ"]))
@@ -205,7 +220,7 @@ def grep_label(inp: dict, cwd: str, registry: dict) -> tuple[str, str]:
     lab = ("public", "trusted")
     labeled = {Path(k) for k in registry}
     for f in _walk(root):
-        cand = file_label(f, registry) if (is_secret_path(f) or f in labeled) else None
+        cand = file_label(f, registry) if (path_conf(f) != "public" or f in labeled) else None
         if not cand or cand == ("public", "trusted"):
             continue
         try:
@@ -217,18 +232,22 @@ def grep_label(inp: dict, cwd: str, registry: dict) -> tuple[str, str]:
     return lab
 
 
+# Commands whose output is arbitrary outside text (web pages, API responses, issue and PR
+# bodies, remote shells). Package managers and git count as trusted: their output is
+# logs, and code already on disk is trusted (see README limits).
 NET_RX = re.compile(
-    r"(^|[\s;&|(`$])(curl|wget|nc|ncat|netcat|socat|ssh|scp|sftp|rsync|ftp|telnet|http|https|"
-    r"gh|aws|gcloud|az|kubectl|npx|uvx|brew|apt|apt-get|dnf|yum|pip3?|pnpm|yarn|bun|deno)\b|"
-    r"\bgit\s+(clone|pull|fetch|ls-remote|submodule|remote\s+update)\b|"
-    r"\bnpm\s+(i|install|ci|update|view|info|exec|create|init)\b|\buv\s+(pip|add|sync|run|tool)\b|"
-    r"\bdocker\s+(pull|run|build)\b|https?://|/dev/tcp/")
+    r"(^|[\s;&|(`$])(curl|wget|nc|ncat|netcat|socat|ssh|scp|sftp|ftp|telnet|http|https|"
+    r"xh|gh|glab|aws|gcloud|az|kubectl|lynx|w3m)\b|https?://|/dev/tcp/")
 ENV_DUMP_RX = re.compile(
     r"(^|[;&|(`]\s*)(env|printenv|set|export\s+-p|declare\s+-x|compgen\s+-v)\s*($|[;&|)>`])|"
     r"\$\{?[A-Za-z_]*(KEY|TOKEN|SECRET|PASSW|CREDENTIAL|PRIVATE)[A-Za-z_]*|"
     r"\b(security\s+find-(generic|internet)-password|gh\s+auth\s+token|aws\s+configure\s+get|"
     r"op\s+(read|item\s+get)|pass\s+show|gcloud\s+auth\s+print-access-token|keyring\s+get)\b",
     re.IGNORECASE)
+PERSONAL_RX = re.compile(
+    r"\bgit\s+config\b[^;&|]*(user\.|--list|\s-l\b|--get-regexp)|"
+    r"(^|[;&|(`]\s*)(whoami|id|hostname|finger|getent\s+passwd)\b|"
+    r"\$\{?(USER|LOGNAME|HOSTNAME|GIT_AUTHOR_\w+|GIT_COMMITTER_\w+)\b")
 CONTROL_RX = re.compile(r"(^|[\s;&|(`$/])nope(\s|$|-engine)|\.nope\b|\.claude/settings|"
                         r"\.claude\.json|claude\s+mcp\b|claude\s+config\b")
 
@@ -237,22 +256,21 @@ def bash_name(cmd: str, cwd: str, registry: dict) -> str:
     """Label a shell command (heuristic, documented as part of the TCB)."""
     if CONTROL_RX.search(cmd):
         return "Bash[nope-config]"
-    secret = bool(ENV_DUMP_RX.search(cmd))
+    conf = "secret" if ENV_DUMP_RX.search(cmd) else \
+        "internal" if PERSONAL_RX.search(cmd) else "public"
     labeled = {Path(k): v for k, v in registry.items()}
     untrusted_file = False
     for tok in re.findall(r"[^\s;&|<>()`'\"=]+", cmd):
         if "/" not in tok and "." not in tok and not tok.startswith("~"):
             continue
         p = _resolve(tok, cwd)
-        if is_secret_path(p):
-            secret = True
+        conf = max(conf, path_conf(p), key=CONFS.index)
         r = labeled.get(p)
         if r:
-            secret |= r["conf"] == "secret"
+            conf = max(conf, r["conf"], key=CONFS.index)
             untrusted_file |= r["integ"] == "untrusted"
     net = bool(NET_RX.search(cmd)) or untrusted_file
-    return "Bash" + {(False, False): "", (True, False): "[secret]", (False, True): "[network]",
-                     (True, True): "[secret,network]"}[(secret, net)]
+    return bash_variant(conf, "untrusted" if net else "trusted")
 
 
 def classify(tool: str, inp: dict, cwd: str, registry: dict) -> str:
@@ -459,7 +477,57 @@ def _is_ours(h: dict) -> bool:
     return "hook claude-code" in str(h.get("command", ""))
 
 
-def setup(settings_path: Path, remove: bool = False) -> str:
+# Shell commands may reach only these hosts (package registries and GitHub), so one
+# command cannot read a secret and send it to an arbitrary server by itself.
+SANDBOX_DOMAINS = [
+    "github.com", "*.github.com", "*.githubusercontent.com", "registry.npmjs.org",
+    "*.npmjs.org", "registry.yarnpkg.com", "pypi.org", "files.pythonhosted.org",
+    "crates.io", "*.crates.io", "proxy.golang.org", "sum.golang.org", "rubygems.org",
+    "repo.maven.apache.org",
+]
+SANDBOX_DENY_WRITE = ["~/.nope", "~/.claude/settings.json", "~/.claude/settings.local.json",
+                      "~/.claude.json"]
+
+
+def sandbox_missing() -> list[str]:
+    """Linux needs bubblewrap and socat for Claude Code's sandbox."""
+    if sys.platform.startswith("linux"):
+        return [b for b in ("bwrap", "socat") if not shutil.which(b)]
+    return []
+
+
+def apparmor_blocks_sandbox() -> bool:
+    """Ubuntu 24.04+ restricts user namespaces unless bwrap has an AppArmor profile."""
+    flag = Path("/proc/sys/kernel/apparmor_restrict_unprivileged_userns")
+    try:
+        restricted = flag.read_text().strip() == "1"
+    except OSError:
+        return False
+    return restricted and not Path("/etc/apparmor.d/bwrap").exists()
+
+
+APPARMOR_FIX = (
+    "  printf 'abi <abi/4.0>,\\ninclude <tunables/global>\\n"
+    "profile bwrap /usr/bin/bwrap flags=(unconfined) {\\n  userns,\\n}\\n' "
+    "| sudo tee /etc/apparmor.d/bwrap >/dev/null\n"
+    "  sudo apparmor_parser -r /etc/apparmor.d/bwrap")
+
+
+def apply_sandbox(data: dict) -> None:
+    sb = data.setdefault("sandbox", {})
+    sb["enabled"] = True
+    sb["failIfUnavailable"] = True          # never silently run without the sandbox
+    sb["allowUnsandboxedCommands"] = False  # no "retry outside the sandbox" escape hatch
+    net = sb.setdefault("network", {})
+    net["strictAllowlist"] = True
+    doms = net.setdefault("allowedDomains", [])
+    doms += [d for d in SANDBOX_DOMAINS if d not in doms]
+    fs = sb.setdefault("filesystem", {})
+    dw = fs.setdefault("denyWrite", [])
+    dw += [d for d in SANDBOX_DENY_WRITE if d not in dw]
+
+
+def setup(settings_path: Path, remove: bool = False, sandbox: bool = True) -> str:
     settings_path = settings_path.expanduser()
     data = json.loads(settings_path.read_text()) if settings_path.exists() and \
         settings_path.read_text().strip() else {}
@@ -472,6 +540,8 @@ def setup(settings_path: Path, remove: bool = False) -> str:
     if not remove:
         pre.insert(0, {"matcher": "*", "hooks": [{
             "type": "command", "command": hook_command(), "timeout": 30, "onFailure": "block"}]})
+        if sandbox:
+            apply_sandbox(data)
     if not pre:
         del data["hooks"]["PreToolUse"]
     if not data["hooks"]:
