@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    name: Build, proofs, axiom audit, differential tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install elan
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+            | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - uses: actions/cache@v4
+        with:
+          path: lean/.lake
+          key: lake-${{ runner.os }}-${{ hashFiles('lean/lean-toolchain', 'lean/lakefile.toml', 'lean/**/*.lean') }}
+
+      - name: Build Lean library, engine and spec checker
+        working-directory: lean
+        run: lake build 2>&1 | tee ../lake-build.log
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Python environment
+        run: |
+          uv venv .venv
+          uv pip install --python .venv/bin/python -e proxy
+
+      - name: Proof hygiene and axiom audit
+        run: .venv/bin/python tests/check_proofs.py lake-build.log
+
+      - name: Differential test, engine tier (12,000 sessions)
+        run: .venv/bin/python tests/differential.py --tier engine --sessions 12000
+
+      - name: Differential test, MCP tier (through the proxy)
+        run: .venv/bin/python tests/differential.py --tier mcp --sessions 60 --parallel 4
+
+  demo:
+    name: Demo scenarios against real MCP servers
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install elan
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+            | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - uses: actions/cache@v4
+        with:
+          path: lean/.lake
+          key: lake-${{ runner.os }}-${{ hashFiles('lean/lean-toolchain', 'lean/lakefile.toml', 'lean/**/*.lean') }}
+      - working-directory: lean
+        run: lake build
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: |
+          uv venv .venv
+          uv pip install --python .venv/bin/python -e proxy
+      - name: Run all scenarios with and without Flowguard
+        working-directory: demo
+        run: ../.venv/bin/python run_demo.py
+      - name: Replay demo audit logs against the Lean spec
+        run: .venv/bin/flowguard audit-check demo/run/logs/*.jsonl

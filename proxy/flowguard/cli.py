@@ -87,7 +87,8 @@ def cmd_init_manifest(args) -> int:
     from mcp import Client
     from mcp.client.stdio import StdioServerParameters
     cfg = _cfg(args)
-    current = load_manifest_json(cfg.manifest) if cfg.manifest.exists() else {"tools": {}}
+    fresh = not cfg.manifest.exists() or not cfg.manifest.read_text().strip()
+    current = {"tools": {}} if fresh else load_manifest_json(cfg.manifest)
     declared = set(current.get("tools", {}))
 
     async def collect():
@@ -108,7 +109,11 @@ def cmd_init_manifest(args) -> int:
         return out
 
     new = asyncio.run(collect())
-    print(json.dumps({"version": 1, "tools": {**current.get("tools", {}), **new}}, indent=2))
+    text = json.dumps({"version": 1, "tools": {**current.get("tools", {}), **new}}, indent=2)
+    if args.output:
+        Path(args.output).write_text(text + "\n")
+    else:
+        print(text)
     print(f"{len(new)} undeclared tools added with restrictive defaults", file=sys.stderr)
     return 0
 
@@ -173,6 +178,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p = with_config(sub.add_parser("init-manifest",
                                    help="emit manifest skeleton for undeclared tools"))
+    p.add_argument("-o", "--output", help="write here instead of stdout (may be the manifest itself)")
     p.set_defaults(fn=cmd_init_manifest)
 
     p = sub.add_parser("audit-check", help="re-check audit logs against the Lean spec")
