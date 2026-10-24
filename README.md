@@ -155,7 +155,7 @@ Tightening a manifest only ever removes behaviors: anything allowed under the st
 | proof hygiene ([`tests/check_proofs.py`](tests/check_proofs.py)) | no `sorry`/`admit`/`axiom`; audit matches committed output |
 | differential, engine tier | **12,000 random sessions, 237,697 events, 240 random manifests: 12,000/12,000 agree** |
 | oracle mutation self-test | 500/500 single flipped verdicts or corrupted states caught |
-| differential, MCP tier | see below |
+| differential, MCP tier | **200 sessions, 4,154 events through `flowguard serve`: 0 spec disagreements, 0 denied calls reached the downstream, all 200 audit logs replay identically** |
 | demo scenarios | 8/8 runs as specified, attacker log as evidence |
 | audit-log replay | every demo, live-client and MCP-tier log re-checks against the spec |
 
