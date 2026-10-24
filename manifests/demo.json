@@ -1,0 +1,335 @@
+{
+  "version": 1,
+  "description": "Demo manifest. fs_secret: a directory of credentials. fs_public: notes + repo working tree; writable while tainted, so its reads are labeled untrusted (prevents laundering taint through storage). fetch: both a source and a sink. git: mutations require a trusted context; repo content is internal and may have been written under taint.",
+  "tools": {
+    "fs_secret__read_file": {
+      "outLabel": {
+        "conf": "secret",
+        "integ": "trusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_secret__read_text_file": {
+      "outLabel": {
+        "conf": "secret",
+        "integ": "trusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_secret__read_media_file": {
+      "outLabel": {
+        "conf": "secret",
+        "integ": "trusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_secret__read_multiple_files": {
+      "outLabel": {
+        "conf": "secret",
+        "integ": "trusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_secret__list_directory": {
+      "outLabel": {
+        "conf": "secret",
+        "integ": "trusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_secret__list_directory_with_sizes": {
+      "outLabel": {
+        "conf": "secret",
+        "integ": "trusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_secret__directory_tree": {
+      "outLabel": {
+        "conf": "secret",
+        "integ": "trusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_secret__search_files": {
+      "outLabel": {
+        "conf": "secret",
+        "integ": "trusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_secret__get_file_info": {
+      "outLabel": {
+        "conf": "secret",
+        "integ": "trusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_secret__list_allowed_directories": {
+      "outLabel": {
+        "conf": "secret",
+        "integ": "trusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_secret__write_file": {
+      "outLabel": {
+        "conf": "secret",
+        "integ": "trusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": true
+    },
+    "fs_secret__edit_file": {
+      "outLabel": {
+        "conf": "secret",
+        "integ": "trusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": true
+    },
+    "fs_secret__create_directory": {
+      "outLabel": {
+        "conf": "secret",
+        "integ": "trusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": true
+    },
+    "fs_secret__move_file": {
+      "outLabel": {
+        "conf": "secret",
+        "integ": "trusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": true
+    },
+    "fs_public__read_file": {
+      "outLabel": {
+        "conf": "public",
+        "integ": "untrusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_public__read_text_file": {
+      "outLabel": {
+        "conf": "public",
+        "integ": "untrusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_public__read_media_file": {
+      "outLabel": {
+        "conf": "public",
+        "integ": "untrusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_public__read_multiple_files": {
+      "outLabel": {
+        "conf": "public",
+        "integ": "untrusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_public__list_directory": {
+      "outLabel": {
+        "conf": "public",
+        "integ": "untrusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_public__list_directory_with_sizes": {
+      "outLabel": {
+        "conf": "public",
+        "integ": "untrusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_public__directory_tree": {
+      "outLabel": {
+        "conf": "public",
+        "integ": "untrusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_public__search_files": {
+      "outLabel": {
+        "conf": "public",
+        "integ": "untrusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_public__get_file_info": {
+      "outLabel": {
+        "conf": "public",
+        "integ": "untrusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_public__list_allowed_directories": {
+      "outLabel": {
+        "conf": "public",
+        "integ": "untrusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "fs_public__write_file": {
+      "outLabel": {
+        "conf": "public",
+        "integ": "untrusted"
+      },
+      "argClearance": "public",
+      "requiresTrusted": false
+    },
+    "fs_public__edit_file": {
+      "outLabel": {
+        "conf": "public",
+        "integ": "untrusted"
+      },
+      "argClearance": "public",
+      "requiresTrusted": false
+    },
+    "fs_public__create_directory": {
+      "outLabel": {
+        "conf": "public",
+        "integ": "untrusted"
+      },
+      "argClearance": "public",
+      "requiresTrusted": false
+    },
+    "fs_public__move_file": {
+      "outLabel": {
+        "conf": "public",
+        "integ": "untrusted"
+      },
+      "argClearance": "public",
+      "requiresTrusted": false
+    },
+    "fetch__fetch": {
+      "outLabel": {
+        "conf": "public",
+        "integ": "untrusted"
+      },
+      "argClearance": "public",
+      "requiresTrusted": false,
+      "description": "Source AND sink: results are attacker-controllable (untrusted), and the URL itself leaves the machine (argClearance public)."
+    },
+    "git__git_status": {
+      "outLabel": {
+        "conf": "internal",
+        "integ": "untrusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "git__git_diff_unstaged": {
+      "outLabel": {
+        "conf": "internal",
+        "integ": "untrusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "git__git_diff_staged": {
+      "outLabel": {
+        "conf": "internal",
+        "integ": "untrusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "git__git_diff": {
+      "outLabel": {
+        "conf": "internal",
+        "integ": "untrusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "git__git_log": {
+      "outLabel": {
+        "conf": "internal",
+        "integ": "untrusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "git__git_show": {
+      "outLabel": {
+        "conf": "internal",
+        "integ": "untrusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "git__git_branch": {
+      "outLabel": {
+        "conf": "internal",
+        "integ": "untrusted"
+      },
+      "argClearance": "secret",
+      "requiresTrusted": false
+    },
+    "git__git_add": {
+      "outLabel": {
+        "conf": "internal",
+        "integ": "trusted"
+      },
+      "argClearance": "internal",
+      "requiresTrusted": true
+    },
+    "git__git_commit": {
+      "outLabel": {
+        "conf": "internal",
+        "integ": "trusted"
+      },
+      "argClearance": "internal",
+      "requiresTrusted": true
+    },
+    "git__git_reset": {
+      "outLabel": {
+        "conf": "internal",
+        "integ": "trusted"
+      },
+      "argClearance": "internal",
+      "requiresTrusted": true
+    },
+    "git__git_create_branch": {
+      "outLabel": {
+        "conf": "internal",
+        "integ": "trusted"
+      },
+      "argClearance": "internal",
+      "requiresTrusted": true
+    },
+    "git__git_checkout": {
+      "outLabel": {
+        "conf": "internal",
+        "integ": "trusted"
+      },
+      "argClearance": "internal",
+      "requiresTrusted": true
+    }
+  }
+}

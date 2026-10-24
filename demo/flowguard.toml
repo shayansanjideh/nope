@@ -1,0 +1,22 @@
+# Flowguard config for the demo. Paths are relative to this file.
+engine = "../lean/.lake/build/bin/flowguard-engine"
+manifest = "../manifests/demo.json"
+state_dir = "run"
+
+# Two instances of the official filesystem server, labeled differently in the manifest.
+[servers.fs_secret]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-filesystem@2.0.0", "sandbox/secrets"]
+
+[servers.fs_public]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-filesystem@2.0.0", "sandbox/public", "sandbox/repo"]
+
+# Official fetch server. The attacker runs on localhost, so private IPs are allowed.
+[servers.fetch]
+command = "uvx"
+args = ["mcp-server-fetch@2026.10.19", "--ignore-robots-txt", "--allow-private-ips"]
+
+[servers.git]
+command = "uvx"
+args = ["mcp-server-git@2026.10.19", "--repository", "sandbox/repo"]
