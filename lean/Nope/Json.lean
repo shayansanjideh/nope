@@ -79,14 +79,24 @@ end JsonIn
 /-- A validated manifest: a finite table of tool declarations. -/
 structure ManifestTable where
   tools : Std.HashMap String Tool
+  /-- Labels for tools not listed in `tools`. Absent: unknown tools are denied. -/
+  defaultTool : Option Tool := none
+  /-- Names that are always denied, even if `defaultTool` is set. -/
+  deny : List String := []
 
-def ManifestTable.toManifest (m : ManifestTable) : Manifest := fun t => m.tools.get? t
+/-- The manifest function the monitor (and every theorem) is about. -/
+def ManifestTable.toManifest (m : ManifestTable) : Manifest := fun t =>
+  if m.deny.contains t then none
+  else match m.tools.get? t with
+    | some tool => some tool
+    | none => m.defaultTool
 
-/-- Parse and validate a manifest: `{"version": 1, "tools": {name: decl, ...}}`.
+/-- Parse and validate a manifest:
+`{"version": 1, "tools": {name: decl, ...}, "defaultTool"?: decl, "deny"?: [name, ...]}`.
 Note: `Lean.Json.parse` keeps only the last of duplicate object keys, so the Python
 loader rejects duplicate tool names before the file reaches the engine. -/
 def ManifestTable.ofJson (j : Json) : Except String ManifestTable := do
-  JsonIn.expectKeys "manifest" j ["version", "tools", "description"]
+  JsonIn.expectKeys "manifest" j ["version", "tools", "description", "defaultTool", "deny"]
   let ver ← (j.getObjVal? "version").mapError (fun _ => "manifest: missing field 'version'")
   unless ver == (1 : Nat) do throw "manifest: unsupported version (expected 1)"
   let tools ← (j.getObjVal? "tools").mapError (fun _ => "manifest: missing field 'tools'")
@@ -96,6 +106,14 @@ def ManifestTable.ofJson (j : Json) : Except String ManifestTable := do
     if name.isEmpty then throw "manifest: empty tool name"
     if m.contains name then throw s!"manifest: duplicate tool '{name}'"
     m := m.insert name (← JsonIn.tool name decl)
-  return ⟨m⟩
+  let dflt ← match j.getObjVal? "defaultTool" with
+    | .ok d => some <$> JsonIn.tool "defaultTool" d
+    | .error _ => pure none
+  let deny ← match j.getObjVal? "deny" with
+    | .ok d => do
+      let arr ← d.getArr?.mapError (fun _ => "manifest: 'deny' must be a list of strings")
+      arr.toList.mapM fun x => x.getStr?.mapError (fun _ => "manifest: 'deny' must be a list of strings")
+    | .error _ => pure []
+  return { tools := m, defaultTool := dflt, deny := deny }
 
 end Nope

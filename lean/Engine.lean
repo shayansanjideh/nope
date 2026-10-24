@@ -37,10 +37,13 @@ def fromNote : Option String → String
 
 /-- Deny messages: (code, plain-English text, exact theorem names). The text is what
 the agent and the user see; the first line is the decision, the second the override. -/
-def denyText (sid : String) (sess : Session) : DenyReason → String × String × String
+def denyText (tbl : ManifestTable) (sid : String) (sess : Session) :
+    DenyReason → String × String × String
   | .unknownTool t =>
     ("unknown_tool",
-     s!"nope: blocked {t}. It is not in the manifest, and unknown tools are always blocked.",
+     if tbl.deny.contains t then
+       s!"nope: blocked {t}. This action is on the always-blocked list (it could switch off or bypass Nope)."
+     else s!"nope: blocked {t}. It is not in the manifest, and unknown tools are always blocked.",
      "Nope.soundness")
   | .confTooHigh t ctx clr =>
     ("conf_too_high",
@@ -64,11 +67,11 @@ def eventJson : Event → Json
   | .declassify c => Json.mkObj [("type", "declassify"), ("conf", c.toStr)]
   | .endorse => Json.mkObj [("type", "endorse")]
 
-def applyEvent (P : Manifest) (sid : String) (sess : Session) (e : Event) : Json × Session :=
-  let (v, st') := Monitor.step P sess.st e
+def applyEvent (tbl : ManifestTable) (sid : String) (sess : Session) (e : Event) : Json × Session :=
+  let (v, st') := Monitor.step tbl.toManifest sess.st e
   match v with
   | .deny r =>
-    let (code, text, thm) := denyText sid sess r
+    let (code, text, thm) := denyText tbl sid sess r
     (Json.mkObj [("session", sid), ("event", eventJson e), ("verdict", "deny"),
       ("code", code), ("reason", text), ("theorem", thm), ("state", stateJson st')], sess)
   | .allow =>
@@ -113,7 +116,7 @@ def handle (tbl : ManifestTable) (sessions : Std.HashMap String Session) (line :
         match JsonIn.event ej with
         | .error e => (errJson e, sessions)
         | .ok e =>
-          let (resp, sess') := applyEvent tbl.toManifest sid (sessions.getD sid {}) e
+          let (resp, sess') := applyEvent tbl sid (sessions.getD sid {}) e
           (resp, sessions.insert sid sess')
       | _, _ => (errJson "request needs a string 'session' and an object 'event'", sessions)
 

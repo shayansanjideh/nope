@@ -7,6 +7,8 @@
   nope sessions --config nope.toml
   nope init-manifest --config nope.toml
   nope audit-check LOG.jsonl... [--speccheck PATH]
+  nope setup claude-code [--settings PATH] [--remove]
+  nope trust PATH... | --all
 """
 
 from __future__ import annotations
@@ -40,8 +42,16 @@ def cmd_serve(args) -> int:
     return 0
 
 
+def _cc_session(args):
+    """A Claude Code hook session with this id, if no proxy config was given."""
+    if args.config or os.environ.get("NOPE_CONFIG"):
+        return None
+    from .claude_code import FileSession
+    s = FileSession(args.session)
+    return s if s.exists() else None
+
+
 def cmd_approve(args) -> int:
-    cfg = _cfg(args)
     check_session_id(args.session)
     if args.action == "endorse":
         event = {"type": "endorse"}
@@ -50,9 +60,14 @@ def cmd_approve(args) -> int:
             print("declassify needs a level: public | internal | secret", file=sys.stderr)
             return 2
         event = {"type": "declassify", "conf": args.level}
-    resp = control.request(cfg.socket_dir / f"{args.session}.sock", {
-        "op": "approve", "event": event,
-        "approver": args.approver or getpass.getuser(), "note": args.note or ""})
+    approver = args.approver or getpass.getuser()
+    cc = _cc_session(args)
+    if cc:
+        resp = cc.decide(event, "approval", approver=approver, note=args.note or "")
+    else:
+        cfg = _cfg(args)
+        resp = control.request(cfg.socket_dir / f"{args.session}.sock", {
+            "op": "approve", "event": event, "approver": approver, "note": args.note or ""})
     if "error" in resp:
         print(f"error: {resp['error']}", file=sys.stderr)
         return 1
@@ -63,6 +78,11 @@ def cmd_approve(args) -> int:
 
 
 def cmd_status(args) -> int:
+    cc = _cc_session(args)
+    if cc:
+        print(json.dumps({"session": args.session, "state": cc.state(), "log": str(cc.log)},
+                         indent=2))
+        return 0
     cfg = _cfg(args)
     resp = control.request(cfg.socket_dir / f"{check_session_id(args.session)}.sock",
                            {"op": "status"})
@@ -115,6 +135,33 @@ def cmd_init_manifest(args) -> int:
     else:
         print(text)
     print(f"{len(new)} undeclared tools added with restrictive defaults", file=sys.stderr)
+    return 0
+
+
+def cmd_hook(args) -> int:
+    from .claude_code import hook_main
+    return hook_main(sys.stdin.read())
+
+
+def cmd_setup(args) -> int:
+    from .claude_code import setup
+    path = Path(args.settings or "~/.claude/settings.json").expanduser()
+    cmd = setup(path, remove=args.remove)
+    if args.remove:
+        print(f"Removed the Nope hook from {path}")
+    else:
+        print(f"Installed the Nope hook in {path}\n  runs: {cmd}\n"
+              "Every Claude Code tool call (built-in and MCP) is now checked by Nope.\n"
+              "Start a new Claude Code session for it to take effect.")
+    return 0
+
+
+def cmd_trust(args) -> int:
+    from .claude_code import trust_paths
+    removed = trust_paths(args.paths, all_=args.all)
+    print(f"cleared remembered labels for {len(removed)} file(s)")
+    for r in removed:
+        print(f"  {r}")
     return 0
 
 
@@ -180,6 +227,22 @@ def main(argv: list[str] | None = None) -> int:
                                    help="emit manifest skeleton for undeclared tools"))
     p.add_argument("-o", "--output", help="write here instead of stdout (may be the manifest itself)")
     p.set_defaults(fn=cmd_init_manifest)
+
+    p = sub.add_parser("hook", help="(used by Claude Code) check one tool call from stdin")
+    p.add_argument("client", choices=["claude-code"])
+    p.set_defaults(fn=cmd_hook)
+
+    p = sub.add_parser("setup", help="install the Nope hook into Claude Code")
+    p.add_argument("client", choices=["claude-code"])
+    p.add_argument("--settings", help="settings file (default ~/.claude/settings.json; "
+                                      "use .claude/settings.json for one project)")
+    p.add_argument("--remove", action="store_true", help="uninstall the hook")
+    p.set_defaults(fn=cmd_setup)
+
+    p = sub.add_parser("trust", help="forget remembered secret/untrusted labels on files")
+    p.add_argument("paths", nargs="*")
+    p.add_argument("--all", action="store_true")
+    p.set_defaults(fn=cmd_trust)
 
     p = sub.add_parser("audit-check", help="re-check audit logs against the Lean spec")
     p.add_argument("logs", nargs="+")
