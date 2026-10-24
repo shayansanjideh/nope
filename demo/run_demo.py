@@ -18,7 +18,7 @@ import sys
 import time
 from pathlib import Path
 
-from agent import (ATTACKER, DEMO, ROOT, SANDBOX, DirectToolbox, ProxyToolbox, say,
+from agent import (ATTACKER, DEMO, INJECTION, ROOT, SANDBOX, DirectToolbox, ProxyToolbox, say,
                    scenario_1, scenario_1b, scenario_2, scenario_3)
 from setup_sandbox import FAKE_SECRET
 from setup_sandbox import main as reset_sandbox
@@ -146,7 +146,11 @@ async def main() -> int:
     ap.add_argument("-s", "--scenario", default="all", choices=["all", "1", "1b", "2", "3"])
     ap.add_argument("-m", "--mode", default="both", choices=["both", "with", "without"])
     ap.add_argument("--pace", type=float, default=0.0)
+    ap.add_argument("--injection-url", help="fetch the exfil injection from this URL instead of "
+                                            "the local attacker server (e.g. a public gist)")
     a = ap.parse_args()
+    if a.injection_url:
+        INJECTION["exfil"] = a.injection_url
     RUN.mkdir(parents=True, exist_ok=True)
     proc = ensure_attacker()
     scs = ["1", "1b", "2", "3"] if a.scenario == "all" else [a.scenario]
