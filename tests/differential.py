@@ -40,11 +40,21 @@ INTEGS = ["trusted", "untrusted"]
 WEIRD = ['quo"te', "back\\slash", "unié中", "tab\tname", "emoji\U0001F600", "sp ace"]
 
 
-def rand_manifest(rng: random.Random, names: list[str]) -> dict:
-    return {"version": 1, "tools": {
-        n: {"outLabel": {"conf": rng.choice(CONFS), "integ": rng.choice(INTEGS)},
+def rand_tool(rng: random.Random) -> dict:
+    return {"outLabel": {"conf": rng.choice(CONFS), "integ": rng.choice(INTEGS)},
             "argClearance": rng.choice(CONFS), "requiresTrusted": rng.random() < 0.35}
-        for n in names}}
+
+
+def rand_manifest(rng: random.Random, names: list[str], extras: list[str] = ()) -> dict:
+    """Random manifest. Sometimes adds a defaultTool (labels for unlisted tools) and a deny
+    list drawn from both declared and undeclared names."""
+    m = {"version": 1, "tools": {n: rand_tool(rng) for n in names}}
+    if extras and rng.random() < 0.4:
+        m["defaultTool"] = rand_tool(rng)
+    if rng.random() < 0.3:
+        pool = list(names) + list(extras)
+        m["deny"] = rng.sample(pool, rng.randint(1, min(3, len(pool))))
+    return m
 
 
 def rand_events(rng: random.Random, declared: list[str], undeclared: list[str], n: int) -> list:
@@ -83,8 +93,8 @@ async def engine_tier(n_sessions: int, seed: int, per_manifest: int) -> int:
         names = [f"srv__tool{i}" for i in range(k)]
         if rng.random() < 0.3:
             names.append(rng.choice(WEIRD))
-        manifest = rand_manifest(rng, names)
         undeclared = ["srv__ghost", "other__x", rng.choice(WEIRD) + "_undeclared"]
+        manifest = rand_manifest(rng, names, undeclared)
         mpath = tmp / f"m{m_idx}.json"
         mpath.write_text(json.dumps(manifest))
         m_idx += 1

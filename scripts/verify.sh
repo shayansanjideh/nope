@@ -20,6 +20,7 @@ attacker_port_free() {
 
 step "lean build"        bash -c 'cd lean && lake build 2>&1 | tee ../.verify-build.log | tail -1'
 step "proof hygiene"     $PY tests/check_proofs.py .verify-build.log
+step "claude code hook"   $PY tests/test_claude_code.py
 if [ -z "${QUICK:-}" ]; then
   step "attacker port"   attacker_port_free
   step "demo scenarios"  bash -c 'set -o pipefail; cd demo && ../.venv/bin/python run_demo.py 2>/dev/null | tail -9'

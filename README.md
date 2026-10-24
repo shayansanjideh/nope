@@ -2,7 +2,7 @@
 
 **Your AI agent reads the internet. Nope makes sure the internet can't tell it what to do.**
 
-Websites, READMEs, GitHub issues and emails can contain hidden instructions for AI agents ("prompt injection"). Real example, from a widely shared post in October 2026: a developer found Claude Code sending their personal details in HTTP headers, because the sites it curled *politely asked agents to identify their users*.
+Websites, READMEs, GitHub issues and emails can contain hidden instructions for AI agents ("prompt injection"). Real example, from [a widely shared post](https://x.com/this_liss/status/2113120507289624714) in October 2026: a developer found Claude Code sending their personal details in HTTP headers, because the sites it curled *politely asked agents to identify their users*.
 
 With Nope installed, that second request never happens:
 
