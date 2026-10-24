@@ -1,0 +1,2 @@
+{"mcpServers": {"flowguard": {"command": "/root/claude-workspace/flowguard/.venv/bin/flowguard",
+  "args": ["serve", "--config", "/root/claude-workspace/flowguard/demo/flowguard.toml", "--session", "live-claude-attack"]}}}

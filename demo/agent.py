@@ -54,7 +54,10 @@ class Toolbox:
         raise NotImplementedError
 
     async def call(self, name: str, args: dict) -> Step:
-        shown = {k: (v if len(str(v)) < 70 else str(v)[:67] + "...") for k, v in args.items()}
+        def short(v):
+            v = str(v).replace(str(SANDBOX), "sandbox") if isinstance(v, str) else v
+            return v if len(str(v)) < 70 else str(v)[:67] + "..."
+        shown = {k: short(v) for k, v in args.items()}
         say(f"  agent -> {name} {shown}", "blue")
         time.sleep(self.pace)
         ok, text = await self._call(name, args)
@@ -62,7 +65,11 @@ class Toolbox:
         if ok:
             say(f"     ok   {first[:110]}", "green")
         elif text.startswith("Flowguard blocked"):
-            say(f"     BLOCKED {text[len('Flowguard blocked '):].splitlines()[0][:300]}", "red")
+            reason = text[len("Flowguard blocked "):].splitlines()[0]
+            reason, _, hint = reason.partition(" A human can approve with: ")
+            say(f"     BLOCKED {reason}", "red")
+            if hint:
+                say(f"             human override: {hint}", "dim")
         else:
             say(f"     error {first[:110]}", "yellow")
         time.sleep(self.pace)
