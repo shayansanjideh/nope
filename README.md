@@ -40,7 +40,7 @@ Normal coding never trips the rules:
 | read a web page, then run `curl`, `git push` or edit `CLAUDE.md` | 🛑 blocked until you approve |
 | switch Nope off or approve itself | 🛑 always blocked |
 
-We checked this with real Claude Code on everyday tasks (write a function and its tests, look up docs then refactor, commit, explore the code): **17 of 17 tool calls went through, zero blocks.** Each check takes about a quarter of a second.
+We checked this with real Claude Code on 8 everyday tasks (write code and tests, search the web then change code and rerun the tests, commit, add docstrings...): **40 of 40 tool calls went through, zero blocks.** Each check takes about a quarter of a second.
 
 ## Proven, not guessed
 

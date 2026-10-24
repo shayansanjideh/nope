@@ -188,7 +188,7 @@ CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs the build, p
 
 **Sandbox:** shell commands run in Claude Code's sandbox with a strict network allowlist (package registries, GitHub), cannot write Nope's or Claude's settings, cannot retry outside the sandbox, and Claude Code refuses to start if the sandbox is unavailable. This contains what happens *inside* one shell command, which Nope's per-call checks cannot see. Allowed hosts remain reachable from the shell.
 
-**Evidence:** [`tests/test_claude_code.py`](../tests/test_claude_code.py) (22 scenarios, including the injection that made Claude Code send personal headers, laundering through files, parallel calls, fail-closed), [`tests/fuzz_hook.py`](../tests/fuzz_hook.py) (266 malformed and hostile payloads: never crashes, never allows what it cannot parse), and real Claude Code runs on everyday tasks with zero false blocks.
+**Evidence:** [`tests/test_claude_code.py`](../tests/test_claude_code.py) (22 scenarios, including the injection that made Claude Code send personal headers, laundering through files, parallel calls, fail-closed), [`tests/fuzz_hook.py`](../tests/fuzz_hook.py) (266 malformed and hostile payloads: never crashes, never allows what it cannot parse), and real Claude Code on 8 everyday tasks: 40 of 40 tool calls allowed, zero false blocks.
 
 ## Prior art
 
