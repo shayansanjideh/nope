@@ -57,10 +57,19 @@ def variant(base: str, conf: str, integ: str) -> str:
     return f"{base}[{','.join(tags)}]" if tags else base
 
 
-def bash_variant(conf: str, integ: str) -> str:
-    tags = [t for t in ("" if conf == "public" else conf,
-                        "network" if integ == "untrusted" else "") if t]
+def bash_variant(conf: str, network: bool, protected: bool) -> str:
+    tags = [t for t in ("" if conf == "public" else conf, "network" if network else "",
+                        "protected" if protected else "") if t]
     return f"Bash[{','.join(tags)}]" if tags else "Bash"
+
+
+def sandboxed() -> bool:
+    """Was `nope setup` run with Claude Code's sandbox on? Without it, every shell
+    command is treated as a protected action."""
+    try:
+        return bool(json.loads((CC_DIR / "config.json").read_text()).get("sandbox"))
+    except (OSError, json.JSONDecodeError):
+        return False
 
 
 def profile_manifest() -> dict:
@@ -79,16 +88,30 @@ def profile_manifest() -> dict:
         tools[base] = L("public", "trusted", "secret", False, "local file write")
         tools[f"{base}[agent-config]"] = L("public", "trusted", "secret", True,
                                            "writes instructions or config the agent loads")
+    # Shell commands only accept public data (they could send it somewhere). Commands that
+    # fetch outside content or have outside effects (push, publish, deploy, ssh) are
+    # protected. Other commands (tests, builds, local git) are protected too unless Claude
+    # Code's sandbox confines them.
+    sb = sandboxed()
     for c in CONFS:
-        for i in INTEGS:
-            tools[bash_variant(c, i)] = L(c, i, "public", True, "shell: can reach the network")
+        for net in (False, True):
+            for prot in (False, True):
+                tools[bash_variant(c, net, prot)] = L(
+                    c, "untrusted" if net else "trusted", "public", net or prot or not sb,
+                    "shell command")
     for base in ("WebFetch", "WebSearch"):
         tools[base] = L("public", "untrusted", "public", False, "web: untrusted source, public sink")
     for base in ("Agent", "Task", "TodoWrite", "ToolSearch", "AskUserQuestion", "ExitPlanMode",
                  "EnterPlanMode", "Skill", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet",
                  "TaskOutput", "TaskStop", "BashOutput", "KillShell", "KillBash"):
         tools[base] = L("public", "trusted", "secret", False, "local, no external effect")
-    deny = [f"{b}[nope-config]" for b in ("Write", "Edit", "MultiEdit", "NotebookEdit", "Bash")]
+    # Recorded after a tool returns, when its output turns out to contain known secret or
+    # personal values (however the command was disguised). Reading is always allowed; it
+    # raises the session label.
+    for c in ("internal", "secret"):
+        tools[f"Output[{c}]"] = L(c, "trusted", "secret", False,
+                                 "tool output contained known sensitive values")
+    deny =[f"{b}[nope-config]" for b in ("Write", "Edit", "MultiEdit", "NotebookEdit", "Bash")]
     m = {
         "version": 1,
         "description": "Nope profile for Claude Code built-in tools",
@@ -244,6 +267,25 @@ ENV_DUMP_RX = re.compile(
     r"\b(security\s+find-(generic|internet)-password|gh\s+auth\s+token|aws\s+configure\s+get|"
     r"op\s+(read|item\s+get)|pass\s+show|gcloud\s+auth\s+print-access-token|keyring\s+get)\b",
     re.IGNORECASE)
+# Commands with effects outside this machine or on how the agent runs.
+PROTECTED_RX = re.compile(
+    r"\bgit\s+(push|config|remote\s+(add|set-url)|credential|send-email|submodule\s+add)\b|"
+    r"\bgh\s+(pr|issue|release|repo|gist|api|secret|workflow|auth)\s|"
+    r"\b(npm|pnpm|yarn)\s+publish\b|\bcargo\s+publish\b|\btwine\s+upload\b|"
+    r"\bdocker\s+(push|login)\b|\bkubectl\s+(apply|delete|create|patch|scale|exec|edit)\b|"
+    r"\bterraform\s+(apply|destroy|import)\b|\bhelm\s+(install|upgrade|uninstall)\b|"
+    r"(^|[\s;&|(`])(aws|gcloud|az|ssh|scp|sftp|rsync|sudo|su|crontab|systemctl|launchctl|"
+    r"vercel|netlify|fly|heroku|firebase|wrangler)\b|"
+    r"\brm\s+-[a-zA-Z]*r[a-zA-Z]*\s+(/|~|\$HOME)")
+MESSAGE_RX = re.compile(r"""(-[A-Za-z]*m|--message|-F)\s*(=\s*)?("(\\.|[^"\\])*"|'[^']*')""")
+HEREDOC_RX = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?.*?\n.*?\n\1\b", re.S)
+
+
+def _strip_text(cmd: str) -> str:
+    """Drop commit messages and heredoc bodies: text, not commands."""
+    return HEREDOC_RX.sub("<<HEREDOC", MESSAGE_RX.sub("-m MSG", cmd))
+
+
 PERSONAL_RX = re.compile(
     r"\bgit\s+config\b[^;&|]*(user\.|--list|\s-l\b|--get-regexp)|"
     r"(^|[;&|(`]\s*)(whoami|id|hostname|finger|getent\s+passwd)\b|"
@@ -256,8 +298,9 @@ def bash_name(cmd: str, cwd: str, registry: dict) -> str:
     """Label a shell command (heuristic, documented as part of the TCB)."""
     if CONTROL_RX.search(cmd):
         return "Bash[nope-config]"
-    conf = "secret" if ENV_DUMP_RX.search(cmd) else \
-        "internal" if PERSONAL_RX.search(cmd) else "public"
+    code = _strip_text(cmd)
+    conf = "secret" if ENV_DUMP_RX.search(code) else \
+        "internal" if PERSONAL_RX.search(code) else "public"
     labeled = {Path(k): v for k, v in registry.items()}
     untrusted_file = False
     for tok in re.findall(r"[^\s;&|<>()`'\"=]+", cmd):
@@ -269,8 +312,8 @@ def bash_name(cmd: str, cwd: str, registry: dict) -> str:
         if r:
             conf = max(conf, r["conf"], key=CONFS.index)
             untrusted_file |= r["integ"] == "untrusted"
-    net = bool(NET_RX.search(cmd)) or untrusted_file
-    return bash_variant(conf, "untrusted" if net else "trusted")
+    net = bool(NET_RX.search(code)) or untrusted_file
+    return bash_variant(conf, net, bool(PROTECTED_RX.search(code)))
 
 
 def classify(tool: str, inp: dict, cwd: str, registry: dict) -> str:
@@ -390,10 +433,24 @@ class FileSession:
         return dec[-1]["state"] if dec else {"conf": "public", "integ": "trusted"}
 
 
-def remember_write(path: Path, state: dict) -> None:
-    lab = (state["conf"], state["integ"])
-    if lab == ("public", "trusted"):
+def written_text(tool: str, inp: dict) -> str:
+    if tool == "Write":
+        return str(inp.get("content", ""))
+    if tool in ("Edit", "NotebookEdit"):
+        return str(inp.get("new_string") or inp.get("new_source") or "")
+    if tool == "MultiEdit":
+        return "\n".join(str(e.get("new_string", "")) for e in inp.get("edits", []))
+    return ""
+
+
+def remember_write(path: Path, text: str, cwd: str) -> None:
+    """If what the agent wrote contains known secret or personal values (in any of the
+    encodings the output scan understands), remember the file at that level, so the
+    value cannot be laundered through the file and read back as public later."""
+    level = output_level(text, cwd, load_registry())
+    if level == "public":
         return
+    lab = (level, "trusted")
     with locked(CC_DIR / "file-labels.lock"):
         reg = load_registry()
         old = reg.get(str(path))
@@ -439,6 +496,135 @@ def deny(reason: str) -> None:
                                              "permissionDecisionReason": reason}}))
 
 
+# --------------------------------------------------------------------------- output scan
+
+HOME_SECRET_FILES = ["~/.aws/credentials", "~/.config/gh/hosts.yml", "~/.netrc", "~/.npmrc",
+                     "~/.pypirc", "~/.docker/config.json", "~/.kube/config",
+                     "~/.git-credentials"]
+SECRET_ENV_RX = re.compile(r"KEY|TOKEN|SECRET|PASSW|CREDENTIAL|PRIVATE|AUTH|SESSION|COOKIE",
+                           re.IGNORECASE)
+VALUE_RX = re.compile(r"""^\s*(?:export\s+)?["']?[\w.\-]+["']?\s*[=:]\s*["']?([^"'\s#][^"'#]*?)["']?\s*,?\s*$""")
+B64_RUN = re.compile(r"[A-Za-z0-9+/_\-]{16,}={0,2}")
+HEX_RUN = re.compile(r"(?:[0-9a-fA-F]{2}[\s:]?){8,}")
+MIN_VALUE = 8
+
+
+def _values_from_text(text: str) -> set[str]:
+    vals: set[str] = set()
+    for line in text.splitlines()[:5000]:
+        m = VALUE_RX.match(line)
+        if m and len(m.group(1).strip()) >= MIN_VALUE:
+            vals.add(m.group(1).strip())
+        s = line.strip()
+        if len(s) >= 20 and re.fullmatch(r"[A-Za-z0-9+/=]+", s):  # PEM / key body lines
+            vals.add(s)
+    return vals
+
+
+def _read_small(p: Path, limit: int = 256_000) -> str | None:
+    try:
+        if p.is_file() and p.stat().st_size <= limit:
+            return p.read_text(errors="replace")
+    except OSError:
+        pass
+    return None
+
+
+def sensitive_values(cwd: str, registry: dict) -> dict[str, set[str]]:
+    """Known secret and personal values on this machine, by confidentiality level.
+    Kept in memory only; never written to disk or logs."""
+    secret: set[str] = set()
+    files = [f for f in _walk(Path(cwd), limit=20000) if is_secret_path(f)]
+    files += [_x(p) for p in HOME_SECRET_FILES]
+    ssh = _x("~/.ssh")
+    if ssh.is_dir():
+        files += [f for f in ssh.iterdir() if f.is_file() and not f.name.endswith(".pub")
+                  and f.name not in ("known_hosts", "known_hosts.old", "config")]
+    files += [Path(k) for k, v in registry.items() if v.get("conf") == "secret"]
+    for f in files:
+        text = _read_small(f)
+        if text:
+            secret |= _values_from_text(text)
+    for k, v in os.environ.items():
+        if SECRET_ENV_RX.search(k) and len(v) >= MIN_VALUE and k not in ("NOPE_HOME",):
+            secret.add(v)
+    personal: set[str] = set()
+    for p in PERSONAL_PATHS[:2]:
+        text = _read_small(_x(p))
+        if text:
+            for m in re.finditer(r"^\s*(email|name)\s*=\s*(.+?)\s*$", text, re.M):
+                v = m.group(2)
+                if (m.group(1) == "email" and "@" in v) or (" " in v and len(v) >= 6):
+                    personal.add(v)
+    return {"secret": secret, "internal": personal - secret}
+
+
+def _decodings(text: str) -> list[str]:
+    import base64
+    import binascii
+    from urllib.parse import unquote_plus
+    out = [text, unquote_plus(text)]
+    for run in B64_RUN.findall(text)[:2000]:
+        for dec in (base64.b64decode, base64.urlsafe_b64decode):
+            try:
+                out.append(dec(run + "=" * (-len(run) % 4)).decode("utf-8", "replace"))
+                break
+            except (binascii.Error, ValueError):
+                continue
+    for run in HEX_RUN.findall(text)[:2000]:
+        try:
+            out.append(bytes.fromhex(re.sub(r"[\s:]", "", run)).decode("utf-8", "replace"))
+        except ValueError:
+            pass
+    # xxd-style dumps: join the hex columns of consecutive lines.
+    cols = re.findall(r"^[0-9a-f]{8}: ((?:[0-9a-f]{4} ?){1,8})", text, re.M)
+    if cols:
+        try:
+            out.append(bytes.fromhex("".join(c.replace(" ", "") for c in cols))
+                       .decode("utf-8", "replace"))
+        except ValueError:
+            pass
+    return out
+
+
+def output_level(response: Any, cwd: str, registry: dict) -> str:
+    """Highest confidentiality of known values found in a tool's output."""
+    text = response if isinstance(response, str) else json.dumps(response, ensure_ascii=False)
+    if len(text) < MIN_VALUE:
+        return "public"
+    vals = sensitive_values(cwd, registry)
+    if not vals["secret"] and not vals["internal"]:
+        return "public"
+    hay = "\n".join(_decodings(text))
+    if any(v in hay for v in vals["secret"]):
+        return "secret"
+    if any(v in hay for v in vals["internal"]):
+        return "internal"
+    return "public"
+
+
+def post_hook_main(stdin: str) -> int:
+    """PostToolUse hook: if a tool's output contained known sensitive values, record that
+    the session has now read them. Fails closed by marking the session secret."""
+    try:
+        data = json.loads(stdin)
+        session, tool = data["session_id"], data["tool_name"]
+        cwd = data.get("cwd") or os.getcwd()
+        level = output_level(data.get("tool_response"), cwd, load_registry())
+        if level != "public":
+            FileSession(session).decide({"type": "call", "tool": f"Output[{level}]"}, "call",
+                                        tool_name=tool, source="output-scan", cwd=cwd)
+        return 0
+    except Exception as e:
+        try:
+            FileSession(data["session_id"]).decide(  # type: ignore[possibly-undefined]
+                {"type": "call", "tool": "Output[secret]"}, "call", source="output-scan-error",
+                error=str(e)[:200])
+        except Exception:
+            pass  # the next PreToolUse will hit the same failure and block
+        return 0
+
+
 def hook_main(stdin: str) -> int:
     """PreToolUse hook entry point. Allow: exit 0 with no output (Claude Code's normal
     permission flow continues). Deny: JSON with the engine's reason. Errors: deny."""
@@ -456,8 +642,8 @@ def hook_main(stdin: str) -> int:
             deny(resp["reason"])
             return 0
         wp = written_path(tool, inp, cwd)
-        if wp is not None:
-            remember_write(wp, resp["state"])
+        if wp is not None and resp["state"]["conf"] != "public":
+            remember_write(wp, written_text(tool, inp), cwd)
         return 0
     except Exception as e:  # fail closed
         deny(f"nope: blocked this call because Nope hit an internal error ({e}). "
@@ -468,13 +654,13 @@ def hook_main(stdin: str) -> int:
 
 # --------------------------------------------------------------------------- setup
 
-def hook_command() -> str:
+def hook_command(sub: str = "claude-code") -> str:
     exe = shutil.which("nope") or str(Path(sys.argv[0]).resolve())
-    return f"'{exe}' hook claude-code"
+    return f"'{exe}' hook {sub}"
 
 
 def _is_ours(h: dict) -> bool:
-    return "hook claude-code" in str(h.get("command", ""))
+    return re.search(r"hook claude-code(-post)?$", str(h.get("command", ""))) is not None
 
 
 # Shell commands may reach only these hosts (package registries and GitHub), so one
@@ -533,18 +719,24 @@ def setup(settings_path: Path, remove: bool = False, sandbox: bool = True) -> st
         settings_path.read_text().strip() else {}
     if settings_path.exists():
         shutil.copy2(settings_path, settings_path.with_suffix(".json.nope-backup"))
-    pre = data.setdefault("hooks", {}).setdefault("PreToolUse", [])
-    for group in pre:
-        group["hooks"] = [h for h in group.get("hooks", []) if not _is_ours(h)]
-    pre[:] = [g for g in pre if g.get("hooks")]
+    hooks = data.setdefault("hooks", {})
+    for event, sub in (("PreToolUse", "claude-code"), ("PostToolUse", "claude-code-post")):
+        groups = hooks.setdefault(event, [])
+        for group in groups:
+            group["hooks"] = [h for h in group.get("hooks", []) if not _is_ours(h)]
+        groups[:] = [g for g in groups if g.get("hooks")]
+        if not remove:
+            groups.insert(0, {"matcher": "*", "hooks": [{
+                "type": "command", "command": hook_command(sub), "timeout": 30,
+                "onFailure": "block"}]})
+        if not groups:
+            del hooks[event]
+    if not remove and sandbox:
+        apply_sandbox(data)
     if not remove:
-        pre.insert(0, {"matcher": "*", "hooks": [{
-            "type": "command", "command": hook_command(), "timeout": 30, "onFailure": "block"}]})
-        if sandbox:
-            apply_sandbox(data)
-    if not pre:
-        del data["hooks"]["PreToolUse"]
-    if not data["hooks"]:
+        CC_DIR.mkdir(parents=True, exist_ok=True)
+        (CC_DIR / "config.json").write_text(json.dumps({"sandbox": sandbox}) + "\n")
+    if not hooks:
         del data["hooks"]
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     settings_path.write_text(json.dumps(data, indent=2) + "\n")

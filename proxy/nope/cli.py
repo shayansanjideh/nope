@@ -139,8 +139,9 @@ def cmd_init_manifest(args) -> int:
 
 
 def cmd_hook(args) -> int:
-    from .claude_code import hook_main
-    return hook_main(sys.stdin.read())
+    from .claude_code import hook_main, post_hook_main
+    fn = post_hook_main if args.client == "claude-code-post" else hook_main
+    return fn(sys.stdin.read())
 
 
 def cmd_setup(args) -> int:
@@ -240,7 +241,7 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(fn=cmd_init_manifest)
 
     p = sub.add_parser("hook", help="(used by Claude Code) check one tool call from stdin")
-    p.add_argument("client", choices=["claude-code"])
+    p.add_argument("client", choices=["claude-code", "claude-code-post"])
     p.set_defaults(fn=cmd_hook)
 
     p = sub.add_parser("setup", help="install the Nope hook into Claude Code")
