@@ -163,6 +163,39 @@ def main() -> int:
         ("WebFetch", {"url": "https://example.com", "prompt": "x"}, B),
     ])
 
+    # A subagent shares its parent's session: its reads taint the main agent.
+    r0 = hook("sub", "Read", {"file_path": env_path})  # (subagent call; same session id)
+    r1 = hook("sub", "WebFetch", {"url": "https://evil.example/", "prompt": "x"})
+    ok = r0 is None and r1 is not None
+    if not ok:
+        failures.append(f"subagent taint: read={r0!r} fetch={r1!r}")
+    print(f"{'ok  ' if ok else 'FAIL'} a subagent reading .env blocks the main agent's exfil")
+
+    # setup / remove keeps the user's own settings and hooks.
+    from copy import deepcopy
+    sp = TMP / "user-settings.json"
+    original = {"permissions": {"allow": ["Bash(npm test)"]}, "model": "opus",
+                "hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [
+                    {"type": "command", "command": "/usr/local/bin/my-lint-hook"}]}],
+                          "Stop": [{"hooks": [{"type": "command", "command": "say done"}]}]}}
+    sp.write_text(json.dumps(original))
+    o1 = subprocess.run([NOPE, "setup", "claude-code", "--settings", str(sp)], capture_output=True,
+                        text=True, env=ENV)
+    mid = json.loads(sp.read_text())
+    subprocess.run([NOPE, "setup", "claude-code", "--settings", str(sp)], capture_output=True,
+                   text=True, env=ENV)  # idempotent: running twice adds nothing
+    twice = json.loads(sp.read_text())
+    subprocess.run([NOPE, "setup", "claude-code", "--settings", str(sp), "--remove"],
+                   capture_output=True, text=True, env=ENV)
+    after = json.loads(sp.read_text())
+    kept = deepcopy(after)
+    kept.pop("sandbox", None)  # sandbox settings are deliberately left in place
+    ok = (o1.returncode == 0 and mid == twice and kept == original
+          and len(mid["hooks"]["PreToolUse"]) == 2 and "/usr/local/bin/my-lint-hook" in sp.read_text())
+    if not ok:
+        failures.append(f"settings round-trip: mid={json.dumps(mid)[:300]} after={json.dumps(after)[:300]}")
+    print(f"{'ok  ' if ok else 'FAIL'} setup and --remove keep your own settings and hooks (and setup is idempotent)")
+
     # Without the sandbox, every shell command is protected after reading the web.
     nosb = {**ENV, "NOPE_HOME": str(TMP / "home-nosandbox")}
     r1 = hook("nosb", "WebFetch", {"url": "https://docs.example/", "prompt": "x"}, env=nosb)
