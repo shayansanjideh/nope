@@ -301,7 +301,9 @@ ENV_DUMP_RX = re.compile(
     re.IGNORECASE)
 # Commands with effects outside this machine or on how the agent runs.
 PROTECTED_RX = re.compile(
-    r"\bgit\s+(push|config|remote\s+(add|set-url)|credential|send-email|submodule\s+add)\b|"
+    r"\bgit\s+(push|remote\s+(add|set-url)|credential|send-email|submodule\s+add)\b|"
+    r"\bgit\s+config\s+(.*\s)?(--add|--unset|--replace-all|--edit|-e|--rename-section)\b|"
+    r"\bgit\s+config\s+(--(global|system|local|worktree)\s+)?[A-Za-z][\w.-]*\s+[^-\s]|"
     r"\bgh\s+(pr|issue|release|repo|gist|api|secret|workflow|auth)\s|"
     r"\b(npm|pnpm|yarn)\s+publish\b|\bcargo\s+publish\b|\btwine\s+upload\b|"
     r"\bdocker\s+(push|login)\b|\bkubectl\s+(apply|delete|create|patch|scale|exec|edit)\b|"

@@ -2,7 +2,7 @@
 
 The details behind the README's claims. Everything here is checked by `scripts/verify.sh` and CI.
 
-Contents: [The theorems](#the-theorems) · [Threat model](#threat-model-and-trusted-computing-base) · [Testing](#how-the-implementation-is-tested) · [Prior art](#prior-art)
+Contents: [The theorems](#the-theorems) · [Testing](#how-the-implementation-is-tested) · [Threat model](#threat-model-and-trusted-computing-base) · [Claude Code integration](#claude-code-integration-what-is-proven-what-is-labeling) · [Prior art](#prior-art)
 
 ## The theorems
 
@@ -161,6 +161,34 @@ CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs the build, p
 - Side effects of a downstream tool beyond what its labels declare.
 - Remote MCP transports (the proxy speaks stdio to the client).
 - Taint across proxy restarts unless you pin `--session`. Reusing a session id replays its audit log into the engine to restore the label, and refuses if the manifest changed.
+
+## Claude Code integration: what is proven, what is labeling
+
+`nope setup claude-code` installs two hooks and turns on Claude Code's sandbox.
+
+**Decided by the proven engine (Theorems 1-7):** every allow/deny. The `PreToolUse` hook maps each call to a manifest tool name and asks `nope-engine`, which runs `Monitor.step`. Session state is an append-only log per Claude session; each check replays it through the engine under a file lock. Every session log re-checks with `nope audit-check`.
+
+**Labeling (trusted, tested, not proven):** the profile in [`proxy/nope/claude_code.py`](../proxy/nope/claude_code.py):
+
+| call | label |
+|---|---|
+| `Read`/`Grep` of a secret file (`.env*`, keys, `~/.ssh`, `~/.aws`, ...) | secret |
+| `Read` of personal identity (`~/.gitconfig`), `git config user.*`, `whoami` | internal |
+| `Grep` | the label of what it would return: secret only if the pattern matches inside a secret file in scope |
+| `WebFetch`, `WebSearch`, `curl`/`wget`/`gh`/`ssh`/cloud CLIs | untrusted output; public sink |
+| other shell commands (tests, builds, local git) | public sink; protected unless the sandbox is on |
+| `git push`, publish, deploy, `gh` writes, `sudo`, `rm -rf ~` | protected |
+| writes to `CLAUDE.md`, `.mcp.json`, `.claude/`, shell rc files, `.git/hooks` | protected |
+| writes to Nope's or Claude's settings, `nope approve` from the agent | always denied (manifest `deny` list) |
+| unlisted tools (e.g. new MCP tools) | `defaultTool`: secret + untrusted output, public sink, protected |
+
+**Output scan (`PostToolUse`):** after each tool runs, its output is searched for the values in your secret files and secret-looking environment variables (and for your git email at the personal level), raw and after decoding base64, hex, `xxd` dumps and URL encoding. A match records an `Output[secret]` read through the engine, raising the session label before the next call. Values stay in memory only. Limit: a value transformed so no piece of at least 8 characters survives intact (reversed, split) is not recognized. [`tests/redteam_bash.py`](../tests/redteam_bash.py) runs 28 disguised reads: 26 are caught, and the 2 deliberate scrambles are reported as known limits.
+
+**Write memory:** if text the agent writes contains known secret values, the file is remembered as secret (in `~/.nope/claude-code/file-labels.json`) and later reads of it are secret. Files are not marked merely because the session was tainted, so ordinary edits never taint future sessions.
+
+**Sandbox:** shell commands run in Claude Code's sandbox with a strict network allowlist (package registries, GitHub), cannot write Nope's or Claude's settings, cannot retry outside the sandbox, and Claude Code refuses to start if the sandbox is unavailable. This contains what happens *inside* one shell command, which Nope's per-call checks cannot see. Allowed hosts remain reachable from the shell.
+
+**Evidence:** [`tests/test_claude_code.py`](../tests/test_claude_code.py) (22 scenarios, including the injection that made Claude Code send personal headers, laundering through files, parallel calls, fail-closed), [`tests/fuzz_hook.py`](../tests/fuzz_hook.py) (266 malformed and hostile payloads: never crashes, never allows what it cannot parse), and real Claude Code runs on everyday tasks with zero false blocks.
 
 ## Prior art
 
