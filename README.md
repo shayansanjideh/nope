@@ -54,8 +54,8 @@ That holds even if the model is fully hijacked, as long as Nope labels the data 
 
 ```sh
 git clone https://github.com/shayansanjideh/nope && cd nope
-(cd lean && lake build)        # needs elan (Lean); builds the engine in ~1 minute
-uv venv && uv pip install -e proxy && source .venv/bin/activate
+(cd lean && lake build)                 # needs elan (Lean); builds the engine in ~1 minute
+uv tool install --editable ./proxy      # puts `nope` on your PATH
 nope setup claude-code
 ```
 
@@ -67,11 +67,11 @@ That's it. Start a new Claude Code session. `setup` does three things:
 
 On Linux, `setup` tells you if the sandbox needs anything installed. Undo with `nope setup claude-code --remove`.
 
-When Nope blocks something you actually want, run the command it prints in another terminal:
+When Nope blocks something you actually want, run the command it prints. Inside Claude Code, prefix it with `!` (Claude can't run these itself; only you can):
 
 ```sh
-nope approve --session <id> endorse              # "I've checked; trust this session again"
-nope approve --session <id> declassify public    # "this data may leave"
+! nope approve --session <id> endorse              # "I've checked; trust this session again"
+! nope approve --session <id> declassify public    # "this data may leave"
 ```
 
 **Other AI tools:** Nope also runs as an MCP proxy, so it works with any MCP client (Claude Desktop, Cursor, custom agents) for the tools you route through it. See [`docs/MCP-PROXY.md`](docs/MCP-PROXY.md). Native integrations for more agents are next.
@@ -79,7 +79,7 @@ nope approve --session <id> declassify public    # "this data may leave"
 ## See it block attacks
 
 ```sh
-cd demo && ../.venv/bin/python run_demo.py
+uv venv && uv pip install -e proxy && cd demo && ../.venv/bin/python run_demo.py
 ```
 
 A deliberately hijacked agent tries to steal a (fake) API key and to commit a malicious script, with and without Nope, against real MCP servers. Without Nope both attacks succeed; with Nope both are blocked. ([recording](docs/scenario1.gif))
