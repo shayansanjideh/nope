@@ -31,28 +31,31 @@ structure Session where
   /-- Most recent tool whose result made the context untrusted. -/
   integSrc : Option String := none
 
-def srcNote : Option String → String
-  | some t => s!" (raised by reading the result of '{t}')"
+def fromNote : Option String → String
+  | some t => s!" (from {t})"
   | none => ""
 
+/-- Deny messages: (code, plain-English text, exact theorem names). The text is what
+the agent and the user see; the first line is the decision, the second the override. -/
 def denyText (sid : String) (sess : Session) : DenyReason → String × String × String
   | .unknownTool t =>
     ("unknown_tool",
-     s!"tool '{t}' is not declared in the manifest; unknown tools are denied by default",
-     "Nope.soundness (Spec.ConfOK requires every executed call to be a declared tool)")
+     s!"nope: blocked {t}. It is not in the manifest, and unknown tools are always blocked.",
+     "Nope.soundness")
   | .confTooHigh t ctx clr =>
     ("conf_too_high",
-     s!"session context confidentiality is '{ctx.toStr}'{srcNote sess.confSrc}, but tool " ++
-     s!"'{t}' has argClearance '{clr.toStr}': its arguments could carry {ctx.toStr} data to " ++
-     s!"a {clr.toStr} sink. A human can approve with: " ++
-     s!"nope approve --session {sid} declassify {clr.toStr}",
-     "Nope.soundness / Nope.conf_between (Theorem 1, confidentiality)")
+     s!"nope: blocked {t}. This session has read {ctx.toStr} data{fromNote sess.confSrc}, " ++
+     s!"and {t} only accepts {clr.toStr} data. " ++
+     "Proven in Lean: Theorems 1 and 6 (confidentiality).\n" ++
+     s!"To allow anyway: nope approve --session {sid} declassify {clr.toStr}",
+     "Nope.soundness, Nope.conf_between, Nope.NI.noninterference_conf")
   | .untrustedContext t =>
     ("untrusted_context",
-     s!"session context is 'untrusted'{srcNote sess.integSrc}, and tool '{t}' is " ++
-     s!"requiresTrusted: untrusted content may be steering this call. A human can approve " ++
-     s!"with: nope approve --session {sid} endorse",
-     "Nope.integrity_between (Theorem 2, integrity)")
+     s!"nope: blocked {t}. This session has read untrusted content{fromNote sess.integSrc}, " ++
+     s!"and {t} is a protected action that needs a trusted session. " ++
+     "Proven in Lean: Theorems 2 and 7 (integrity).\n" ++
+     s!"To allow anyway: nope approve --session {sid} endorse",
+     "Nope.integrity_between, Nope.NI.noninterference_integ")
 
 def stateJson (st : State) : Json := st.ctx.toJson
 

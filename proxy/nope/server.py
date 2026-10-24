@@ -144,13 +144,11 @@ class NopeProxy:
             resp = await self._decide({"type": "call", "tool": name}, "call", arguments=arguments)
         except EngineError as e:
             log(f"BLOCKED {name}: engine failure ({e})")
-            return text_result(f"Nope blocked '{name}': policy engine unavailable "
-                               f"(fail closed): {e}", True)
+            return text_result(f"nope: blocked {name}. The policy engine is unavailable, so "
+                               f"every call is blocked (fail closed): {e}", True)
         if resp["verdict"] != "allow":
-            log(f"BLOCKED {name}: {resp['reason']}")
-            return text_result(
-                f"Nope blocked '{name}': {resp['reason']}\n"
-                f"Guarantee: {resp.get('theorem')}", True)
+            log(resp["reason"].splitlines()[0])
+            return text_result(resp["reason"], True)
         route = self.routes.get(name)
         if route is None:
             self.audit.write("result", tool=name, is_error=True, error="no downstream provides tool")

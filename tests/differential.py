@@ -209,7 +209,7 @@ async def mcp_session(rng: random.Random, tmp: Path, idx: int) -> tuple[dict, li
                 args = {"i": i}
                 r = await c.call_tool(e["tool"], args)
                 text = r.content[0].text if r.content else ""
-                denied = bool(r.is_error) and text.startswith("Nope blocked")
+                denied = bool(r.is_error) and text.startswith("nope: blocked")
                 verdicts.append("deny" if denied else "allow")
                 if not denied:
                     sent.append((e["tool"].split("__", 1)[1], args))

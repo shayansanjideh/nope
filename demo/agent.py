@@ -64,12 +64,11 @@ class Toolbox:
         first = text.strip().splitlines()[0] if text.strip() else ""
         if ok:
             say(f"     ok   {first[:110]}", "green")
-        elif text.startswith("Nope blocked"):
-            reason = text[len("Nope blocked "):].splitlines()[0]
-            reason, _, hint = reason.partition(" A human can approve with: ")
-            say(f"     BLOCKED {reason}", "red")
-            if hint:
-                say(f"             human override: {hint}", "dim")
+        elif text.startswith("nope: blocked"):
+            first, *rest = text.splitlines()
+            say(f"     {first}", "red")
+            for line in rest:
+                say(f"     {line}", "dim")
         else:
             say(f"     error {first[:110]}", "yellow")
         time.sleep(self.pace)
