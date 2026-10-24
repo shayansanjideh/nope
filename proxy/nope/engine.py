@@ -1,4 +1,4 @@
-"""Client for the `flowguard-engine` JSON-lines process.
+"""Client for the `nope-engine` JSON-lines process.
 
 No policy logic lives here. Requests are serialized under a lock so that one
 response line always belongs to one request. Any failure (engine crash, bad

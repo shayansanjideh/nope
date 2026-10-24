@@ -1,6 +1,6 @@
 import Lean.Data.Json
 import Std.Data.HashMap
-import Flowguard.Monitor
+import Nope.Monitor
 
 /-!
 # JSON codecs
@@ -9,7 +9,7 @@ Data conversion only: no policy decisions are made here. Shared by the engine an
 the spec checker.
 -/
 
-namespace Flowguard
+namespace Nope
 open Lean (Json)
 
 def Conf.toStr : Conf → String
@@ -98,4 +98,4 @@ def ManifestTable.ofJson (j : Json) : Except String ManifestTable := do
     m := m.insert name (← JsonIn.tool name decl)
   return ⟨m⟩
 
-end Flowguard
+end Nope

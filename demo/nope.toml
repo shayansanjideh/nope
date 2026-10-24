@@ -1,5 +1,5 @@
-# Flowguard config for the demo. Paths are relative to this file.
-engine = "../lean/.lake/build/bin/flowguard-engine"
+# Nope config for the demo. Paths are relative to this file.
+engine = "../lean/.lake/build/bin/nope-engine"
 manifest = "../manifests/demo.json"
 state_dir = "run"
 

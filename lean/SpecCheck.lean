@@ -1,8 +1,8 @@
-import Flowguard.Json
-import Flowguard.Spec
+import Nope.Json
+import Nope.Spec
 
 /-!
-# flowguard-speccheck
+# nope-speccheck
 
 Differential-test oracle. Each input line is a recorded session:
 
@@ -11,14 +11,14 @@ Differential-test oracle. Each input line is a recorded session:
 
 Every verdict and reported state is judged against the independent spec
 (`Spec.check`, `Spec.confSince`, `Spec.integSince`). `Monitor.step` is never called.
-By `Flowguard.monitor_exact`, a call should be allowed iff the spec accepts the
+By `Nope.monitor_exact`, a call should be allowed iff the spec accepts the
 executed trace extended with it. Approvals are always allowed.
 
 Output: one line per input, `{"ok": true, "n": N}` or `{"ok": false, "errors": [...]}`.
 -/
 
 open Lean (Json)
-open Flowguard
+open Nope
 
 def specLabel (P : Manifest) (exec : List Event) : Label :=
   ⟨Spec.confSince P Label.bot.conf exec.reverse, Spec.integSince P Label.bot.integ exec.reverse⟩

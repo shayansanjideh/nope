@@ -67,8 +67,8 @@ jobs:
       - run: |
           uv venv .venv
           uv pip install --python .venv/bin/python -e proxy
-      - name: Run all scenarios with and without Flowguard
+      - name: Run all scenarios with and without Nope
         working-directory: demo
         run: ../.venv/bin/python run_demo.py
       - name: Replay demo audit logs against the Lean spec
-        run: .venv/bin/flowguard audit-check demo/run/logs/*.jsonl
+        run: .venv/bin/nope audit-check demo/run/logs/*.jsonl

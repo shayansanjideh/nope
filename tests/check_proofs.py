@@ -22,7 +22,7 @@ REQUIRED = ["soundness", "soundness_executed", "conf_between", "integrity", "int
 
 def main() -> int:
     fail = False
-    srcs = list((LEAN / "Flowguard").glob("*.lean")) + [LEAN / "Flowguard.lean"]
+    srcs = list((LEAN / "Nope").glob("*.lean")) + [LEAN / "Nope.lean"]
     for f in srcs:
         for n, line in enumerate(f.read_text().splitlines(), 1):
             code = line.split("--")[0]
@@ -42,7 +42,7 @@ def main() -> int:
             print(f"DISALLOWED AXIOMS: {line}")
             fail = True
     for thm in REQUIRED:
-        if f"'Flowguard.{thm}'" not in out:
+        if f"'Nope.{thm}'" not in out:
             print(f"theorem {thm} missing from axiom audit")
             fail = True
     committed = (LEAN / "axioms-output.txt").read_text()

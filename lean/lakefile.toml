@@ -1,14 +1,14 @@
-name = "flowguard"
+name = "nope"
 version = "0.1.0"
-defaultTargets = ["Flowguard", "flowguard-engine", "flowguard-speccheck"]
+defaultTargets = ["Nope", "nope-engine", "nope-speccheck"]
 
 [[lean_lib]]
-name = "Flowguard"
+name = "Nope"
 
 [[lean_exe]]
-name = "flowguard-engine"
+name = "nope-engine"
 root = "Engine"
 
 [[lean_exe]]
-name = "flowguard-speccheck"
+name = "nope-speccheck"
 root = "SpecCheck"

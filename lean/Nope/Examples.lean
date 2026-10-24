@@ -1,4 +1,4 @@
-import Flowguard.Theorems
+import Nope.Theorems
 
 /-!
 # Concrete sanity checks
@@ -7,7 +7,7 @@ Small closed examples evaluated by the kernel (`decide`) so the spec is visibly
 non-vacuous on the demo scenarios.
 -/
 
-namespace Flowguard.Examples
+namespace Nope.Examples
 open Spec Monitor
 
 def secretsRead : Tool := ⟨⟨.secret, .trusted⟩, .secret, false⟩
@@ -42,4 +42,4 @@ example : check P Label.bot
 example : (run P init [.call "shell__exec"]).1 = [.deny (.unknownTool "shell__exec")] := by
   decide
 
-end Flowguard.Examples
+end Nope.Examples

@@ -1,12 +1,12 @@
-import Flowguard.Json
+import Nope.Json
 
 /-!
-# flowguard-engine
+# nope-engine
 
 Long-lived decision engine speaking JSON lines on stdin/stdout. Every decision is
-made by `Flowguard.Monitor.step`, the function the theorems are about.
+made by `Nope.Monitor.step`, the function the theorems are about.
 
-Startup: `flowguard-engine --manifest PATH [--validate]`. Prints one line
+Startup: `nope-engine --manifest PATH [--validate]`. Prints one line
 `{"ready": true, ...}` once the manifest is loaded and validated.
 
 Requests (one JSON object per line):
@@ -21,7 +21,7 @@ Responses: `{"verdict": "allow"|"deny", "code": ..., "reason": ..., "state": ...
 -/
 
 open Lean (Json)
-open Flowguard
+open Nope
 
 /-- Engine-side bookkeeping for nicer deny messages. Not consulted for decisions. -/
 structure Session where
@@ -39,20 +39,20 @@ def denyText (sid : String) (sess : Session) : DenyReason → String × String �
   | .unknownTool t =>
     ("unknown_tool",
      s!"tool '{t}' is not declared in the manifest; unknown tools are denied by default",
-     "Flowguard.soundness (Spec.ConfOK requires every executed call to be a declared tool)")
+     "Nope.soundness (Spec.ConfOK requires every executed call to be a declared tool)")
   | .confTooHigh t ctx clr =>
     ("conf_too_high",
      s!"session context confidentiality is '{ctx.toStr}'{srcNote sess.confSrc}, but tool " ++
      s!"'{t}' has argClearance '{clr.toStr}': its arguments could carry {ctx.toStr} data to " ++
      s!"a {clr.toStr} sink. A human can approve with: " ++
-     s!"flowguard approve --session {sid} declassify {clr.toStr}",
-     "Flowguard.soundness / Flowguard.conf_between (Theorem 1, confidentiality)")
+     s!"nope approve --session {sid} declassify {clr.toStr}",
+     "Nope.soundness / Nope.conf_between (Theorem 1, confidentiality)")
   | .untrustedContext t =>
     ("untrusted_context",
      s!"session context is 'untrusted'{srcNote sess.integSrc}, and tool '{t}' is " ++
      s!"requiresTrusted: untrusted content may be steering this call. A human can approve " ++
-     s!"with: flowguard approve --session {sid} endorse",
-     "Flowguard.integrity_between (Theorem 2, integrity)")
+     s!"with: nope approve --session {sid} endorse",
+     "Nope.integrity_between (Theorem 2, integrity)")
 
 def stateJson (st : State) : Json := st.ctx.toJson
 
@@ -131,7 +131,7 @@ def loadManifest (path : System.FilePath) : IO ManifestTable := do
   | .ok m => pure m
   | .error e => throw (IO.userError s!"manifest {path}: {e}")
 
-def usage : String := "usage: flowguard-engine --manifest PATH [--validate]"
+def usage : String := "usage: nope-engine --manifest PATH [--validate]"
 
 def main (args : List String) : IO UInt32 := do
   let stderr ← IO.getStderr
@@ -144,7 +144,7 @@ def main (args : List String) : IO UInt32 := do
   | none => stderr.putStrLn usage; return 2
   | some (path, validateOnly) =>
     let tbl ← try loadManifest path catch e => do
-      stderr.putStrLn s!"flowguard-engine: {e}"; return 2
+      stderr.putStrLn s!"nope-engine: {e}"; return 2
     let stdout ← IO.getStdout
     stdout.putStrLn (Json.mkObj [("ready", true), ("tools", tbl.tools.size)]).compress
     stdout.flush

@@ -1,12 +1,12 @@
-"""flowguard command line.
+"""nope command line.
 
-  flowguard serve   --config flowguard.toml [--session ID]
-  flowguard approve --config flowguard.toml --session ID endorse
-  flowguard approve --config flowguard.toml --session ID declassify public|internal|secret
-  flowguard status  --config flowguard.toml --session ID
-  flowguard sessions --config flowguard.toml
-  flowguard init-manifest --config flowguard.toml
-  flowguard audit-check LOG.jsonl... [--speccheck PATH]
+  nope serve   --config nope.toml [--session ID]
+  nope approve --config nope.toml --session ID endorse
+  nope approve --config nope.toml --session ID declassify public|internal|secret
+  nope status  --config nope.toml --session ID
+  nope sessions --config nope.toml
+  nope init-manifest --config nope.toml
+  nope audit-check LOG.jsonl... [--speccheck PATH]
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from .logreplay import read_records, speccheck_input
 
 
 def _cfg(args):
-    return load_config(args.config or os.environ.get("FLOWGUARD_CONFIG", "flowguard.toml"))
+    return load_config(args.config or os.environ.get("NOPE_CONFIG", "nope.toml"))
 
 
 def cmd_serve(args) -> int:
@@ -119,8 +119,8 @@ def cmd_init_manifest(args) -> int:
 
 
 def default_speccheck() -> str:
-    here = Path(__file__).resolve().parents[2] / "lean/.lake/build/bin/flowguard-speccheck"
-    return str(here) if here.exists() else "flowguard-speccheck"
+    here = Path(__file__).resolve().parents[2] / "lean/.lake/build/bin/nope-speccheck"
+    return str(here) if here.exists() else "nope-speccheck"
 
 
 def cmd_audit_check(args) -> int:
@@ -147,13 +147,13 @@ def cmd_audit_check(args) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="flowguard", description=__doc__,
+    ap = argparse.ArgumentParser(prog="nope", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     def with_config(p):
-        p.add_argument("--config", help="path to flowguard.toml (default: $FLOWGUARD_CONFIG "
-                                        "or ./flowguard.toml)")
+        p.add_argument("--config", help="path to nope.toml (default: $NOPE_CONFIG "
+                                        "or ./nope.toml)")
         return p
 
     p = with_config(sub.add_parser("serve", help="run the MCP proxy on stdio"))
@@ -190,7 +190,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return args.fn(args)
     except (ConfigError, RuntimeError) as e:
-        print(f"flowguard: {e}", file=sys.stderr)
+        print(f"nope: {e}", file=sys.stderr)
         return 2
 
 

@@ -9,7 +9,7 @@ Two-dimensional security labels, combined as a product lattice.
 * Integrity (taint): `trusted < untrusted`
 -/
 
-namespace Flowguard
+namespace Nope
 
 inductive Conf where
   | pub
@@ -115,4 +115,4 @@ theorem sup_le {a b c : Label} : a ≤ c → b ≤ c → max a b ≤ c :=
 
 end Label
 
-end Flowguard
+end Nope

@@ -1,4 +1,4 @@
-"""Run the demo scenarios with and without Flowguard and check the evidence.
+"""Run the demo scenarios with and without Nope and check the evidence.
 
   python demo/run_demo.py                 # all scenarios, both modes
   python demo/run_demo.py -s 1 -m with    # one scenario, one mode
@@ -23,10 +23,10 @@ from agent import (ATTACKER, DEMO, ROOT, SANDBOX, DirectToolbox, ProxyToolbox, s
 from setup_sandbox import FAKE_SECRET
 from setup_sandbox import main as reset_sandbox
 
-CONFIG = DEMO / "flowguard.toml"
+CONFIG = DEMO / "nope.toml"
 RUN = DEMO / "run"
 ATTACKER_LOG = RUN / "attacker.log"
-FLOWGUARD = str(ROOT / ".venv/bin/flowguard")
+NOPE = str(ROOT / ".venv/bin/nope")
 
 TITLES = {
     "1": "Scenario 1: exfiltration via fetch (read secret, then injected page says fetch it out)",
@@ -75,9 +75,9 @@ def git_log() -> list[str]:
 def approve_endorse(session: str):
     def run():
         say("  human: reviews the blocked commit and approves it", "mag")
-        cmd = [FLOWGUARD, "approve", "--config", str(CONFIG), "--session", session, "endorse",
+        cmd = [NOPE, "approve", "--config", str(CONFIG), "--session", session, "endorse",
                "--approver", "demo-human", "--note", "reviewed deploy.sh hotfix"]
-        say(f"  $ flowguard approve --session {session} endorse", "mag")
+        say(f"  $ nope approve --session {session} endorse", "mag")
         out = subprocess.run(cmd, capture_output=True, text=True)
         for line in (out.stdout + out.stderr).strip().splitlines():
             say(f"    {line}", "mag")
@@ -90,7 +90,7 @@ async def run_one(sc: str, mode: str, pace: float) -> tuple[bool, str]:
     session = f"demo-s{sc}"
     (RUN / "logs" / f"{session}.jsonl").unlink(missing_ok=True)
     say()
-    say(f"=== {TITLES[sc]}  [Flowguard {'ON' if mode == 'with' else 'OFF'}]", "bold")
+    say(f"=== {TITLES[sc]}  [Nope {'ON' if mode == 'with' else 'OFF'}]", "bold")
     tb = ProxyToolbox(CONFIG, session) if mode == "with" else DirectToolbox(CONFIG)
     tb.pace = pace
     async with tb:
@@ -133,7 +133,7 @@ async def run_one(sc: str, mode: str, pace: float) -> tuple[bool, str]:
             "green" if all_ok and written else "red")
         ok, verdict = all_ok and written, "all allowed" if all_ok else "something blocked"
     if mode == "with":
-        out = subprocess.run([FLOWGUARD, "audit-check", str(RUN / "logs" / f"{session}.jsonl")],
+        out = subprocess.run([NOPE, "audit-check", str(RUN / "logs" / f"{session}.jsonl")],
                              capture_output=True, text=True)
         say(f"  audit log re-checked against Lean spec: {out.stdout.strip()}",
             "green" if out.returncode == 0 else "red")
@@ -163,7 +163,7 @@ async def main() -> int:
     say()
     say("=== Summary", "bold")
     for sc, mode, ok, verdict in results:
-        say(f"  {'PASS' if ok else 'FAIL'}  scenario {sc:2s}  Flowguard {'ON ' if mode == 'with' else 'OFF'}"
+        say(f"  {'PASS' if ok else 'FAIL'}  scenario {sc:2s}  Nope {'ON ' if mode == 'with' else 'OFF'}"
             f"  {verdict}", "green" if ok else "red")
     return 0 if all(r[2] for r in results) else 1
 

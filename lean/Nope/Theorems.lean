@@ -1,4 +1,4 @@
-import Flowguard.Spec
+import Nope.Spec
 
 /-!
 # Theorems
@@ -12,7 +12,7 @@ import Flowguard.Spec
 Plus: the Bool checker agrees with the Prop spec (`check_iff`).
 -/
 
-namespace Flowguard
+namespace Nope
 open Spec Monitor
 
 variable {P : Manifest}
@@ -418,4 +418,4 @@ theorem check_iff (l0 : Label) (tr : List Event) : check P l0 tr = true ↔ Spec
 instance (l0 : Label) (tr : List Event) : Decidable (Spec P l0 tr) :=
   decidable_of_iff _ (check_iff l0 tr)
 
-end Flowguard
+end Nope

@@ -1,16 +1,16 @@
 [project]
-name = "flowguard"
+name = "nope-mcp"
 version = "0.1.0"
 description = "MCP proxy that enforces a Lean-verified information-flow policy on every tool call"
 requires-python = ">=3.11"
 dependencies = ["mcp>=2.3,<3"]
 
 [project.scripts]
-flowguard = "flowguard.cli:main"
+nope = "nope.cli:main"
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["flowguard"]
+packages = ["nope"]

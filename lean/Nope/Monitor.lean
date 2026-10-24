@@ -1,12 +1,12 @@
-import Flowguard.Labels
+import Nope.Labels
 
 /-!
 # Monitor
 
-The reference monitor. This exact code is compiled into `flowguard-engine`.
+The reference monitor. This exact code is compiled into `nope-engine`.
 -/
 
-namespace Flowguard
+namespace Nope
 
 /-- Per-tool declarations from the manifest. -/
 structure Tool where
@@ -95,4 +95,4 @@ def allAllowed (P : Manifest) (s : State) (es : List Event) : Prop :=
   ∀ v ∈ (run P s es).1, v.isAllow = true
 
 end Monitor
-end Flowguard
+end Nope

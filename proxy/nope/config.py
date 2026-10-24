@@ -69,10 +69,10 @@ def _resolve(base: Path, p: str) -> Path:
 
 
 def default_engine() -> Path | None:
-    here = Path(__file__).resolve().parents[2] / "lean/.lake/build/bin/flowguard-engine"
+    here = Path(__file__).resolve().parents[2] / "lean/.lake/build/bin/nope-engine"
     if here.exists():
         return here
-    found = shutil.which("flowguard-engine")
+    found = shutil.which("nope-engine")
     return Path(found) if found else None
 
 
@@ -90,7 +90,7 @@ def load_config(path: str | Path) -> Config:
         raise ConfigError("config: 'manifest' is required")
     engine = _resolve(base, raw["engine"]) if "engine" in raw else default_engine()
     if engine is None or not engine.exists():
-        raise ConfigError("config: flowguard-engine not found (build lean/ or set 'engine')")
+        raise ConfigError("config: nope-engine not found (build lean/ or set 'engine')")
     servers = []
     for name, s in (raw.get("servers") or {}).items():
         if not NAME_RE.match(name) or SEP in name:
@@ -109,7 +109,7 @@ def load_config(path: str | Path) -> Config:
         raise ConfigError("config: no [servers.*] defined")
     return Config(
         path=path, engine=engine, manifest=_resolve(base, raw["manifest"]),
-        state_dir=_resolve(base, raw.get("state_dir", "~/.flowguard")), servers=servers,
+        state_dir=_resolve(base, raw.get("state_dir", "~/.nope")), servers=servers,
     )
 
 

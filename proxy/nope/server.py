@@ -26,14 +26,14 @@ from .logreplay import decision_records, read_records
 
 
 def log(msg: str) -> None:
-    print(f"[flowguard] {msg}", file=sys.stderr, flush=True)
+    print(f"[nope] {msg}", file=sys.stderr, flush=True)
 
 
 def text_result(text: str, is_error: bool) -> types.CallToolResult:
     return types.CallToolResult(content=[types.TextContent(type="text", text=text)], is_error=is_error)
 
 
-class FlowguardProxy:
+class NopeProxy:
     def __init__(self, cfg: Config, session: str, fsync: bool = True):
         self.cfg = cfg
         self.session = session
@@ -144,17 +144,17 @@ class FlowguardProxy:
             resp = await self._decide({"type": "call", "tool": name}, "call", arguments=arguments)
         except EngineError as e:
             log(f"BLOCKED {name}: engine failure ({e})")
-            return text_result(f"Flowguard blocked '{name}': policy engine unavailable "
+            return text_result(f"Nope blocked '{name}': policy engine unavailable "
                                f"(fail closed): {e}", True)
         if resp["verdict"] != "allow":
             log(f"BLOCKED {name}: {resp['reason']}")
             return text_result(
-                f"Flowguard blocked '{name}': {resp['reason']}\n"
+                f"Nope blocked '{name}': {resp['reason']}\n"
                 f"Guarantee: {resp.get('theorem')}", True)
         route = self.routes.get(name)
         if route is None:
             self.audit.write("result", tool=name, is_error=True, error="no downstream provides tool")
-            return text_result(f"Flowguard: no downstream server provides '{name}'", True)
+            return text_result(f"Nope: no downstream server provides '{name}'", True)
         client, orig = route
         try:
             result = await client.call_tool(orig, arguments or {})
@@ -192,15 +192,15 @@ class FlowguardProxy:
             return await self.call_tool(params.name, params.arguments)
 
         return Server(
-            "flowguard", version=__version__,
-            instructions="Tool calls pass through Flowguard, an information-flow monitor. "
+            "nope", version=__version__,
+            instructions="Tool calls pass through Nope, an information-flow monitor. "
                          "Blocked calls return an error explaining which label blocked them.",
             on_list_tools=on_list_tools, on_call_tool=on_call_tool,
         )
 
 
 async def serve_stdio(cfg: Config, session: str) -> None:
-    proxy = FlowguardProxy(cfg, session)
+    proxy = NopeProxy(cfg, session)
     try:
         await proxy.start()
         server = proxy.mcp_server()

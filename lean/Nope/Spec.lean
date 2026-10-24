@@ -1,4 +1,4 @@
-import Flowguard.Monitor
+import Nope.Monitor
 
 /-!
 # Independent trace specification
@@ -12,7 +12,7 @@ confidentiality of every result read, and stops at the most recent `declassify`.
 `integSince` does the same for integrity and stops at the most recent `endorse`.
 -/
 
-namespace Flowguard
+namespace Nope
 namespace Spec
 
 /-- Label of a tool's result as declared in the manifest. Unknown tools are treated
@@ -73,4 +73,4 @@ def check (P : Manifest) (l0 : Label) (tr : List Event) : Bool :=
     | _ => true
 
 end Spec
-end Flowguard
+end Nope

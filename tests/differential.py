@@ -4,12 +4,12 @@ Tier "engine": N random sessions over random manifests, driven through the proxy
 real EngineClient (engine process, JSON lines, per-session state). Sessions sharing a
 manifest run concurrently, so their requests interleave inside one engine process.
 
-Tier "mcp": sessions through the real `flowguard serve` proxy in front of a stub MCP
+Tier "mcp": sessions through the real `nope serve` proxy in front of a stub MCP
 server. Also checks that the stub received exactly the allowed calls, and replays
 the audit logs.
 
 Every recorded session (events, verdicts, reported states) is judged by
-`flowguard-speccheck`, which uses only Spec.check / confSince / integSince.
+`nope-speccheck`, which uses only Spec.check / confSince / integSince.
 
   python tests/differential.py --tier engine --sessions 10000
   python tests/differential.py --tier mcp --sessions 200
@@ -29,12 +29,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "proxy"))
-from flowguard import control  # noqa: E402
-from flowguard.engine import EngineClient, EngineError  # noqa: E402
-from flowguard.logreplay import read_records, speccheck_input  # noqa: E402
+from nope import control  # noqa: E402
+from nope.engine import EngineClient, EngineError  # noqa: E402
+from nope.logreplay import read_records, speccheck_input  # noqa: E402
 
-ENGINE = ROOT / "lean/.lake/build/bin/flowguard-engine"
-SPECCHECK = ROOT / "lean/.lake/build/bin/flowguard-speccheck"
+ENGINE = ROOT / "lean/.lake/build/bin/nope-engine"
+SPECCHECK = ROOT / "lean/.lake/build/bin/nope-speccheck"
 CONFS = ["public", "internal", "secret"]
 INTEGS = ["trusted", "untrusted"]
 WEIRD = ['quo"te', "back\\slash", "unié中", "tab\tname", "emoji\U0001F600", "sp ace"]
@@ -188,7 +188,7 @@ async def mcp_session(rng: random.Random, tmp: Path, idx: int) -> tuple[dict, li
     (d / "manifest.json").write_text(json.dumps(manifest))
     record = d / "stub_calls.jsonl"
     record.touch()
-    (d / "flowguard.toml").write_text(
+    (d / "nope.toml").write_text(
         f'engine = "{ENGINE}"\nmanifest = "manifest.json"\nstate_dir = "state"\n'
         f'[servers.stub]\ncommand = "{sys.executable}"\n'
         f'args = ["{Path(__file__).parent / "stub_server.py"}", "{record}", '
@@ -196,8 +196,8 @@ async def mcp_session(rng: random.Random, tmp: Path, idx: int) -> tuple[dict, li
     session = f"diff{idx}"
     evs = rand_events(rng, [f"stub__{n}" for n in declared_local],
                       ["stub__hidden0", "nosuch__tool"], rng.randint(5, 40))
-    params = StdioServerParameters(command=str(ROOT / ".venv/bin/flowguard"),
-                                   args=["serve", "--config", str(d / "flowguard.toml"),
+    params = StdioServerParameters(command=str(ROOT / ".venv/bin/nope"),
+                                   args=["serve", "--config", str(d / "nope.toml"),
                                          "--session", session])
     verdicts, sent = [], []
     async with Client(params) as c:
@@ -209,7 +209,7 @@ async def mcp_session(rng: random.Random, tmp: Path, idx: int) -> tuple[dict, li
                 args = {"i": i}
                 r = await c.call_tool(e["tool"], args)
                 text = r.content[0].text if r.content else ""
-                denied = bool(r.is_error) and text.startswith("Flowguard blocked")
+                denied = bool(r.is_error) and text.startswith("Nope blocked")
                 verdicts.append("deny" if denied else "allow")
                 if not denied:
                     sent.append((e["tool"].split("__", 1)[1], args))

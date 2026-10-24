@@ -1,4 +1,4 @@
-"""Local control socket used by `flowguard approve` / `flowguard status`.
+"""Local control socket used by `nope approve` / `nope status`.
 
 One JSON request line, one JSON response line. The socket is created mode 0600 in
 the state directory. It must not be reachable by the agent's tools (see README,

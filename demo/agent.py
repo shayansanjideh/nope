@@ -2,11 +2,11 @@
 
 Plays a fully hijacked model: it reads tool results, follows any instructions it
 finds, and when a step is blocked it still emits the rest of the attacker's plan.
-The point: Flowguard's guarantee does not depend on the model refusing.
+The point: Nope's guarantee does not depend on the model refusing.
 
 Two toolboxes with identical downstream servers (same config):
-  * ProxyToolbox  - through `flowguard serve` (Flowguard ON)
-  * DirectToolbox - straight to the downstream servers (Flowguard OFF)
+  * ProxyToolbox  - through `nope serve` (Nope ON)
+  * DirectToolbox - straight to the downstream servers (Nope OFF)
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from mcp.client.stdio import StdioServerParameters
 DEMO = Path(__file__).resolve().parent
 ROOT = DEMO.parent
 sys.path.insert(0, str(ROOT / "proxy"))
-from flowguard.config import SEP, load_config  # noqa: E402
+from nope.config import SEP, load_config  # noqa: E402
 
 SANDBOX = DEMO / "sandbox"
 ATTACKER = "http://127.0.0.1:8666"
@@ -64,8 +64,8 @@ class Toolbox:
         first = text.strip().splitlines()[0] if text.strip() else ""
         if ok:
             say(f"     ok   {first[:110]}", "green")
-        elif text.startswith("Flowguard blocked"):
-            reason = text[len("Flowguard blocked "):].splitlines()[0]
+        elif text.startswith("Nope blocked"):
+            reason = text[len("Nope blocked "):].splitlines()[0]
             reason, _, hint = reason.partition(" A human can approve with: ")
             say(f"     BLOCKED {reason}", "red")
             if hint:
@@ -85,7 +85,7 @@ def _text(result) -> str:
 class ProxyToolbox(Toolbox):
     def __init__(self, config: Path, session: str):
         self.params = StdioServerParameters(
-            command=str(ROOT / ".venv/bin/flowguard"),
+            command=str(ROOT / ".venv/bin/nope"),
             args=["serve", "--config", str(config), "--session", session])
         self.steps = []
 
@@ -103,7 +103,7 @@ class ProxyToolbox(Toolbox):
 
 
 class DirectToolbox(Toolbox):
-    """No Flowguard: route `server__tool` straight to the downstream server."""
+    """No Nope: route `server__tool` straight to the downstream server."""
 
     def __init__(self, config: Path):
         self.cfg = load_config(config)
@@ -183,7 +183,7 @@ async def scenario_3(tb: Toolbox) -> None:
                           {"path": str(SANDBOX / "public/notes/meeting.md")})
     url = re.search(r"(http://\S+docs\S+\.html)", notes.text)
     docs = await tb.call("fetch__fetch", {"url": url.group(1) if url else
-                                          f"{ATTACKER}/docs/flowguard.html"})
+                                          f"{ATTACKER}/docs/nope.html"})
     body = docs.text.split("\n", 1)[-1].strip()
     summary = "# Summary of engine docs\n\n" + body[:400] + "\n"
     await tb.call("fs_public__write_file",
