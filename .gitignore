@@ -1,0 +1,7 @@
+.lake/
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+/run/
+*.egg-info/

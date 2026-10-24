@@ -1,0 +1,31 @@
+'Flowguard.Conf.le_refl' does not depend on any axioms
+'Flowguard.Conf.le_trans' does not depend on any axioms
+'Flowguard.Conf.le_antisymm' does not depend on any axioms
+'Flowguard.Conf.le_sup_left' does not depend on any axioms
+'Flowguard.Conf.le_sup_right' does not depend on any axioms
+'Flowguard.Conf.sup_le' does not depend on any axioms
+'Flowguard.Integ.le_refl' does not depend on any axioms
+'Flowguard.Integ.le_trans' does not depend on any axioms
+'Flowguard.Integ.le_antisymm' does not depend on any axioms
+'Flowguard.Integ.le_sup_left' does not depend on any axioms
+'Flowguard.Integ.le_sup_right' does not depend on any axioms
+'Flowguard.Integ.sup_le' does not depend on any axioms
+'Flowguard.Label.le_refl' does not depend on any axioms
+'Flowguard.Label.le_trans' does not depend on any axioms
+'Flowguard.Label.le_antisymm' depends on axioms: [propext]
+'Flowguard.Label.le_sup_left' does not depend on any axioms
+'Flowguard.Label.le_sup_right' does not depend on any axioms
+'Flowguard.Label.sup_le' does not depend on any axioms
+'Flowguard.soundness' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Flowguard.soundness_executed' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Flowguard.conf_between' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Flowguard.integrity' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Flowguard.integrity_executed' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Flowguard.integrity_between' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Flowguard.precision' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Flowguard.monitor_exact' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Flowguard.call_monotone' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Flowguard.downgrade_only_by_approval' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Flowguard.run_calls_monotone' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Flowguard.policy_monotone' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Flowguard.check_iff' depends on axioms: [propext, Quot.sound]

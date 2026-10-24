@@ -1,0 +1,14 @@
+name = "flowguard"
+version = "0.1.0"
+defaultTargets = ["Flowguard", "flowguard-engine", "flowguard-speccheck"]
+
+[[lean_lib]]
+name = "Flowguard"
+
+[[lean_exe]]
+name = "flowguard-engine"
+root = "Engine"
+
+[[lean_exe]]
+name = "flowguard-speccheck"
+root = "SpecCheck"
