@@ -96,3 +96,7 @@ A deliberately hijacked agent tries to steal a (fake) API key and to commit a ma
 ## How it compares
 
 Most agent-security tools *detect* attacks (classifiers, rules). Nope *enforces* where data may flow and proves the enforcement correct. Google DeepMind's CaMeL and Microsoft's FIDES use similar ideas inside research agents; Nope is a drop-in for the agent you already use, with machine-checked proofs. Full comparison: [`docs/PROOFS.md`](docs/PROOFS.md#prior-art).
+
+## License
+
+Apache-2.0. See [`LICENSE`](LICENSE).
