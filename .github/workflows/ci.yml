@@ -38,6 +38,15 @@ jobs:
       - name: Proof hygiene and axiom audit
         run: .venv/bin/python tests/check_proofs.py lake-build.log
 
+      - name: Claude Code hook tests (22 scenarios)
+        run: .venv/bin/python tests/test_claude_code.py
+
+      - name: Bash red team (disguised secret reads)
+        run: .venv/bin/python tests/redteam_bash.py
+
+      - name: Hook fuzzing
+        run: .venv/bin/python tests/fuzz_hook.py
+
       - name: Differential test, engine tier (12,000 sessions)
         run: .venv/bin/python tests/differential.py --tier engine --sessions 12000
 
