@@ -54,6 +54,18 @@ That holds even if the model is fully hijacked, as long as Nope labels the data 
 
 ## Install (Claude Code)
 
+Prebuilt engine, no Lean needed (pick `linux-x86_64`, `linux-arm64` or `macos-arm64`):
+
+```sh
+mkdir -p ~/.local/bin
+curl -sSL https://github.com/shayansanjideh/nope/releases/latest/download/nope-engine-linux-x86_64.tar.gz \
+  | tar -xz -C ~/.local/bin
+uv tool install "git+https://github.com/shayansanjideh/nope#subdirectory=proxy"   # puts `nope` on your PATH
+nope setup claude-code
+```
+
+Or build the engine from source, so the binary you run is the one you compiled from the proofs:
+
 ```sh
 git clone https://github.com/shayansanjideh/nope && cd nope
 (cd lean && lake build)                 # needs elan (Lean); builds the engine in ~1 minute

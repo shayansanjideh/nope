@@ -73,7 +73,11 @@ def default_engine() -> Path | None:
     if here.exists():
         return here
     found = shutil.which("nope-engine")
-    return Path(found) if found else None
+    if found:
+        return Path(found)
+    # Where the README's prebuilt install puts it; hooks may run without ~/.local/bin on PATH.
+    local = Path.home() / ".local/bin/nope-engine"
+    return local if local.exists() else None
 
 
 def load_config(path: str | Path) -> Config:

@@ -1,0 +1,81 @@
+name: Release binaries
+
+# Builds nope-engine and nope-speccheck for each platform so users can install without Lean.
+# Push a tag like v0.1.0 to publish a GitHub release; pull requests touching the build only
+# check that every platform still compiles.
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - "lean/**"
+      - ".github/workflows/release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: linux-x86_64
+          - os: ubuntu-22.04-arm
+            target: linux-arm64
+          - os: macos-14
+            target: macos-arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install elan
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+            | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Build engine and spec checker
+        working-directory: lean
+        run: lake build nope-engine nope-speccheck
+
+      - name: Smoke test
+        run: |
+          echo '{"session":"s","event":{"type":"call","tool":"fs_secret__read_file"}}' \
+            | lean/.lake/build/bin/nope-engine --manifest manifests/demo.json | tee out.txt
+          grep -q '"verdict":"allow"' out.txt
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp lean/.lake/build/bin/nope-engine lean/.lake/build/bin/nope-speccheck LICENSE dist/
+          tar -czf nope-engine-${{ matrix.target }}.tar.gz -C dist .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nope-engine-${{ matrix.target }}
+          path: nope-engine-${{ matrix.target }}.tar.gz
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd artifacts
+          sha256sum *.tar.gz > SHA256SUMS
+          gh release create "${GITHUB_REF_NAME}" *.tar.gz SHA256SUMS \
+            --repo "${GITHUB_REPOSITORY}" --title "${GITHUB_REF_NAME}" --generate-notes
