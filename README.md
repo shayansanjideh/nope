@@ -15,10 +15,13 @@ With Nope installed, here's that sequence run by real Claude Code. The personal 
 
 nope: blocked Bash[network]. This session has read internal data (from Bash[internal]),
 and Bash[network] only accepts public data. Proven in Lean: Theorems 1 and 6 (confidentiality).
-To allow anyway: nope approve --session 1d90d98f-… declassify public
+It has also read untrusted content (from Bash[network]), and Bash[network] is a protected action.
+To allow anyway, run both:
+  nope approve --session 1d90d98f-… declassify public
+  nope approve --session 1d90d98f-… endorse
 ```
 
-([session log](docs/evidence/claude-code-personal-header.jsonl))
+([session log](docs/evidence/claude-code-personal-header.jsonl), recorded before the block message listed both approvals)
 
 ## How it works
 

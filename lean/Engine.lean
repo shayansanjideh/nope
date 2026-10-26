@@ -46,11 +46,21 @@ def denyText (tbl : ManifestTable) (sid : String) (sess : Session) :
      else s!"nope: blocked {t}. It is not in the manifest, and unknown tools are always blocked.",
      "Nope.soundness")
   | .confTooHigh t ctx clr =>
+    -- The monitor checks confidentiality first, so a call that would also fail the
+    -- integrity check needs both approvals. Name both, so one retry is enough.
+    let alsoUntrusted : Bool := match tbl.toManifest t with
+      | some tool => tool.requiresTrusted && decide (sess.st.ctx.integ ≠ .trusted)
+      | none => false
     ("conf_too_high",
      s!"nope: blocked {t}. This session has read {ctx.toStr} data{fromNote sess.confSrc}, " ++
      s!"and {t} only accepts {clr.toStr} data. " ++
      "Proven in Lean: Theorems 1 and 6 (confidentiality).\n" ++
-     s!"To allow anyway: nope approve --session {sid} declassify {clr.toStr}",
+     (if alsoUntrusted then
+       s!"It has also read untrusted content{fromNote sess.integSrc}, and {t} is a protected action. " ++
+       "To allow anyway, run both:\n" ++
+       s!"  nope approve --session {sid} declassify {clr.toStr}\n" ++
+       s!"  nope approve --session {sid} endorse"
+     else s!"To allow anyway: nope approve --session {sid} declassify {clr.toStr}"),
      "Nope.soundness, Nope.conf_between, Nope.NI.noninterference_conf")
   | .untrustedContext t =>
     ("untrusted_context",
