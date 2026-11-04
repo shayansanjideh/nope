@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Demo manifest. fs_secret: file contents are secret; names and metadata are not. fs_public: notes + repo working tree; writable while tainted, so content reads are labeled untrusted (prevents laundering taint through storage). fetch: both a source and a sink. git: mutations require a trusted context; status returns names only; log and diff carry project content and match fs_public reads; git_show and git_branch stay internal.",
+  "description": "Demo manifest. fs_secret: file contents are secret; names and metadata are not. fs_public: notes + repo working tree; writable while tainted, so content reads are labeled untrusted (prevents laundering taint through storage). fetch: both a source and a sink. git: mutations require a trusted context; status returns names only; diff carries project content and matches fs_public reads; log (author emails), git_show and git_branch stay internal.",
   "tools": {
     "fs_secret__read_file": {
       "outLabel": {
@@ -285,12 +285,11 @@
     },
     "git__git_log": {
       "outLabel": {
-        "conf": "public",
+        "conf": "internal",
         "integ": "untrusted"
       },
       "argClearance": "secret",
-      "requiresTrusted": false,
-      "description": "Project content: same label as reading a project file with fs_public."
+      "requiresTrusted": false
     },
     "git__git_show": {
       "outLabel": {

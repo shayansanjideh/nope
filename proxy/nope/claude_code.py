@@ -321,12 +321,11 @@ def _strip_text(cmd: str) -> str:
     return HEREDOC_RX.sub("<<HEREDOC", MESSAGE_RX.sub("-m MSG", cmd))
 
 
-# Plain status, log and diff inside the project. Their output often shows the user's own
-# name and email (commit authors), which says nothing about what the session is doing, so
-# identity found there doesn't raise the label. Secrets still do. Anything that picks the
-# output format (--format=%ae) or leaves the project doesn't match.
+# Plain status and diff inside the project. Identity found there is incidental, so it
+# doesn't raise the label. Secrets still do. `git log` isn't here: it prints the user's
+# email, and sending that out is the attack Nope exists to stop.
 PLAIN_GIT_RX = re.compile(
-    r"^\s*git\s+(status|log|diff)((\s+--?[a-z][a-z0-9-]*(=\d+)?)|(\s+-\d+)|"
+    r"^\s*git\s+(status|diff)((\s+--?[a-z][a-z0-9-]*(=\d+)?)|(\s+-\d+)|"
     r"(\s+(?![/~])(?!\S*\.\.[/\\])[\w./@^~:-]+))*\s*$")
 
 
