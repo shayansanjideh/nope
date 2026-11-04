@@ -31,9 +31,11 @@ def labels() -> None:
                   "directory_tree", "get_file_info", "search_files"):
             check(f"{srv}__{t} is public/trusted", lab(f"{srv}__{t}") == ("public", "trusted"))
     check("git_status is public/trusted", lab("git__git_status") == ("public", "trusted"))
-    read = lab("fs_public__read_text_file")
+    for t in ("read_file", "read_text_file", "read_media_file", "read_multiple_files"):
+        check(f"fs_public__{t} is public/trusted", lab(f"fs_public__{t}") == ("public", "trusted"))
     for t in ("git_diff", "git_diff_staged", "git_diff_unstaged"):
-        check(f"{t} matches a project file read", lab(f"git__{t}") == read)
+        check(f"{t} matches a project file read", lab(f"git__{t}") == ("public", "trusted"))
+    check("fetch output stays untrusted", lab("fetch__fetch") == ("public", "untrusted"))
     # Contents stay where they were.
     for t in ("read_file", "read_text_file", "read_media_file", "read_multiple_files"):
         check(f"fs_secret__{t} stays secret", lab(f"fs_secret__{t}")[0] == "secret")
@@ -107,6 +109,39 @@ def git_log_leak() -> None:
     check("curl with the email after git log is blocked", "nope: blocked" in out)
 
 
+def trust_rules() -> None:
+    """Regression through the real engine with demo.json."""
+    import asyncio
+
+    from nope.engine import EngineClient
+
+    async def run() -> None:
+        eng = EngineClient(ROOT / "lean/.lake/build/bin/nope-engine", ROOT / "manifests/demo.json")
+        await eng.start()
+        try:
+            async def seq(sid: str, *tools: str) -> list[str]:
+                return [(await eng.call(sid, t))["verdict"] for t in tools]
+
+            read = "fs_public__read_text_file"
+            check("repo reads then commit is allowed", await seq(
+                "a", read, "git__git_diff_unstaged", "git__git_status", "git__git_add",
+                "git__git_commit") == ["allow"] * 5)
+            check("after a web read, a protected write is blocked", (await seq(
+                "b", "fetch__fetch", read, "git__git_commit"))[-1] == "deny")
+            check("trusted reads don't clear web taint", (await seq(
+                "c", "fetch__fetch", read, "git__git_diff_staged", "git__git_add"))[-1] == "deny")
+            check("after a secret read, a network call is blocked", (await seq(
+                "d", "fs_secret__read_text_file", "fetch__fetch"))[-1] == "deny")
+            check("repo reads don't clear a secret", (await seq(
+                "e", "fs_secret__read_text_file", read, "fetch__fetch"))[-1] == "deny")
+            check("after git log, a network call is blocked", (await seq(
+                "f", "git__git_log", "fetch__fetch"))[-1] == "deny")
+        finally:
+            await eng.close()
+
+    asyncio.run(run())
+
+
 REASON_CONF = ("nope: blocked fetch__fetch. This session has read secret data (from "
                "fs_secret__read_text_file), and fetch__fetch only accepts public data. Proven in "
                "Lean: Theorems 1 and 6 (confidentiality).\nTo allow anyway: nope approve "
@@ -164,6 +199,6 @@ def messages() -> None:
 
 
 if __name__ == "__main__":
-    labels(); classifier(); output_scan(); git_log_leak(); messages()
+    labels(); classifier(); output_scan(); git_log_leak(); trust_rules(); messages()
     print(f"\n{len(fails)} failures")
     sys.exit(1 if fails else 0)
