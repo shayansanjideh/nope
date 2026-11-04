@@ -33,6 +33,7 @@ from typing import Any
 
 from .audit import now
 from .config import check_session_id, default_engine
+from .messages import explain_block
 
 HOME = Path(os.environ.get("NOPE_HOME", Path.home() / ".nope")).expanduser()
 CC_DIR = HOME / "claude-code"
@@ -318,6 +319,19 @@ HEREDOC_RX = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?.*?\n.*?\n\1\b", re.S)
 def _strip_text(cmd: str) -> str:
     """Drop commit messages and heredoc bodies: text, not commands."""
     return HEREDOC_RX.sub("<<HEREDOC", MESSAGE_RX.sub("-m MSG", cmd))
+
+
+# Plain status and diff inside the project. Identity found there is incidental, so it
+# doesn't raise the label. Secrets still do. `git log` isn't here: it prints the user's
+# email, and sending that out is the attack Nope exists to stop.
+PLAIN_GIT_RX = re.compile(
+    r"^\s*git\s+(status|diff)((\s+--?[a-z][a-z0-9-]*(=\d+)?)|(\s+-\d+)|"
+    r"(\s+(?![/~])(?!\S*\.\.[/\\])[\w./@^~:-]+))*\s*$")
+
+
+def plain_git(tool: str, inp: Any) -> bool:
+    return tool == "Bash" and isinstance(inp, dict) and \
+        bool(PLAIN_GIT_RX.match(str(inp.get("command", ""))))
 
 
 PERSONAL_RX = re.compile(
@@ -645,6 +659,8 @@ def post_hook_main(stdin: str) -> int:
         session, tool = data["session_id"], data["tool_name"]
         cwd = data.get("cwd") or os.getcwd()
         level = output_level(data.get("tool_response"), cwd, load_registry())
+        if level == "internal" and plain_git(tool, data.get("tool_input")):
+            level = "public"
         if level != "public":
             FileSession(session).decide({"type": "call", "tool": f"Output[{level}]"}, "call",
                                         tool_name=tool, source="output-scan", cwd=cwd)
@@ -673,7 +689,7 @@ def hook_main(stdin: str) -> int:
             {"type": "call", "tool": name}, "call", tool_name=tool, tool_input=_summ(inp),
             agent_id=data.get("agent_id"), cwd=cwd)
         if resp["verdict"] != "allow":
-            deny(resp["reason"])
+            deny(explain_block(resp["reason"], inp))
             return 0
         wp = written_path(tool, inp, cwd)
         if wp is not None and resp["state"]["conf"] != "public":

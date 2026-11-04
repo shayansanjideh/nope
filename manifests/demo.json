@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Demo manifest. fs_secret: a directory of credentials. fs_public: notes + repo working tree; writable while tainted, so its reads are labeled untrusted (prevents laundering taint through storage). fetch: both a source and a sink. git: mutations require a trusted context; repo content is internal and may have been written under taint.",
+  "description": "Demo manifest. fs_secret: file contents are secret; names and metadata are not. fs_public: notes + repo working tree; writable while tainted, so content reads are labeled untrusted (prevents laundering taint through storage). fetch: both a source and a sink. git: mutations require a trusted context; status returns names only; diff carries project content and matches fs_public reads; log (author emails), git_show and git_branch stay internal.",
   "tools": {
     "fs_secret__read_file": {
       "outLabel": {
@@ -36,51 +36,57 @@
     },
     "fs_secret__list_directory": {
       "outLabel": {
-        "conf": "secret",
+        "conf": "public",
         "integ": "trusted"
       },
       "argClearance": "secret",
-      "requiresTrusted": false
+      "requiresTrusted": false,
+      "description": "File names and metadata only, never contents."
     },
     "fs_secret__list_directory_with_sizes": {
       "outLabel": {
-        "conf": "secret",
+        "conf": "public",
         "integ": "trusted"
       },
       "argClearance": "secret",
-      "requiresTrusted": false
+      "requiresTrusted": false,
+      "description": "File names and metadata only, never contents."
     },
     "fs_secret__directory_tree": {
       "outLabel": {
-        "conf": "secret",
+        "conf": "public",
         "integ": "trusted"
       },
       "argClearance": "secret",
-      "requiresTrusted": false
+      "requiresTrusted": false,
+      "description": "File names and metadata only, never contents."
     },
     "fs_secret__search_files": {
       "outLabel": {
-        "conf": "secret",
+        "conf": "public",
         "integ": "trusted"
       },
       "argClearance": "secret",
-      "requiresTrusted": false
+      "requiresTrusted": false,
+      "description": "File names and metadata only, never contents."
     },
     "fs_secret__get_file_info": {
       "outLabel": {
-        "conf": "secret",
+        "conf": "public",
         "integ": "trusted"
       },
       "argClearance": "secret",
-      "requiresTrusted": false
+      "requiresTrusted": false,
+      "description": "File names and metadata only, never contents."
     },
     "fs_secret__list_allowed_directories": {
       "outLabel": {
-        "conf": "secret",
+        "conf": "public",
         "integ": "trusted"
       },
       "argClearance": "secret",
-      "requiresTrusted": false
+      "requiresTrusted": false,
+      "description": "File names and metadata only, never contents."
     },
     "fs_secret__write_file": {
       "outLabel": {
@@ -149,50 +155,56 @@
     "fs_public__list_directory": {
       "outLabel": {
         "conf": "public",
-        "integ": "untrusted"
+        "integ": "trusted"
       },
       "argClearance": "secret",
-      "requiresTrusted": false
+      "requiresTrusted": false,
+      "description": "File names and metadata only, never contents."
     },
     "fs_public__list_directory_with_sizes": {
       "outLabel": {
         "conf": "public",
-        "integ": "untrusted"
+        "integ": "trusted"
       },
       "argClearance": "secret",
-      "requiresTrusted": false
+      "requiresTrusted": false,
+      "description": "File names and metadata only, never contents."
     },
     "fs_public__directory_tree": {
       "outLabel": {
         "conf": "public",
-        "integ": "untrusted"
+        "integ": "trusted"
       },
       "argClearance": "secret",
-      "requiresTrusted": false
+      "requiresTrusted": false,
+      "description": "File names and metadata only, never contents."
     },
     "fs_public__search_files": {
       "outLabel": {
         "conf": "public",
-        "integ": "untrusted"
+        "integ": "trusted"
       },
       "argClearance": "secret",
-      "requiresTrusted": false
+      "requiresTrusted": false,
+      "description": "File names and metadata only, never contents."
     },
     "fs_public__get_file_info": {
       "outLabel": {
         "conf": "public",
-        "integ": "untrusted"
+        "integ": "trusted"
       },
       "argClearance": "secret",
-      "requiresTrusted": false
+      "requiresTrusted": false,
+      "description": "File names and metadata only, never contents."
     },
     "fs_public__list_allowed_directories": {
       "outLabel": {
         "conf": "public",
-        "integ": "untrusted"
+        "integ": "trusted"
       },
       "argClearance": "secret",
-      "requiresTrusted": false
+      "requiresTrusted": false,
+      "description": "File names and metadata only, never contents."
     },
     "fs_public__write_file": {
       "outLabel": {
@@ -237,35 +249,39 @@
     },
     "git__git_status": {
       "outLabel": {
-        "conf": "internal",
-        "integ": "untrusted"
+        "conf": "public",
+        "integ": "trusted"
       },
       "argClearance": "secret",
-      "requiresTrusted": false
+      "requiresTrusted": false,
+      "description": "File names only, never contents."
     },
     "git__git_diff_unstaged": {
       "outLabel": {
-        "conf": "internal",
+        "conf": "public",
         "integ": "untrusted"
       },
       "argClearance": "secret",
-      "requiresTrusted": false
+      "requiresTrusted": false,
+      "description": "Project content: same label as reading a project file with fs_public."
     },
     "git__git_diff_staged": {
       "outLabel": {
-        "conf": "internal",
+        "conf": "public",
         "integ": "untrusted"
       },
       "argClearance": "secret",
-      "requiresTrusted": false
+      "requiresTrusted": false,
+      "description": "Project content: same label as reading a project file with fs_public."
     },
     "git__git_diff": {
       "outLabel": {
-        "conf": "internal",
+        "conf": "public",
         "integ": "untrusted"
       },
       "argClearance": "secret",
-      "requiresTrusted": false
+      "requiresTrusted": false,
+      "description": "Project content: same label as reading a project file with fs_public."
     },
     "git__git_log": {
       "outLabel": {
