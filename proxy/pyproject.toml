@@ -1,6 +1,6 @@
 [project]
 name = "nope-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP proxy that enforces a Lean-verified information-flow policy on every tool call"
 requires-python = ">=3.11"
 dependencies = ["mcp>=2.3,<3"]

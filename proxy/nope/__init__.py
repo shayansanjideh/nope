@@ -4,4 +4,4 @@ Python handles I/O only. Every allow/deny decision is made by the compiled Lean
 engine (`nope-engine`), which runs `Nope.Monitor.step`.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
