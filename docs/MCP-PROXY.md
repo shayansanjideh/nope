@@ -47,7 +47,9 @@ Each tool gets three settings:
 claude mcp add nope -- $(which nope) serve --config $PWD/nope.toml --session my-session
 ```
 
-When something is blocked, the agent sees why and the exact override command:
+Tools that return only names and metadata (directory listings, `git status`) don't need a secret label: `manifests/demo.json` labels them public and trusted, even on a secrets folder. `git log` and `git diff` carry project content, so they get the same label as reading a project file. `git log` shows commit author emails, and the proxy has no output scan, so label it `internal` if those emails matter to you.
+
+When something is blocked, the agent sees why and the exact override command. If the override would let data leave, the message leads with what would leave and where it would go, and tells the agent not to ask for the approval unless the user asked to send that data there:
 
 ```sh
 nope approve --config nope.toml --session my-session endorse            # trust the session again

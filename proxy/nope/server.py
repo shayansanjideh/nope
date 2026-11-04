@@ -23,6 +23,7 @@ from .audit import AuditLog
 from .config import SEP, Config, load_manifest_json
 from .engine import EngineClient, EngineError
 from .logreplay import decision_records, read_records
+from .messages import explain_block
 
 
 def log(msg: str) -> None:
@@ -148,7 +149,7 @@ class NopeProxy:
                                f"every call is blocked (fail closed): {e}", True)
         if resp["verdict"] != "allow":
             log(resp["reason"].splitlines()[0])
-            return text_result(resp["reason"], True)
+            return text_result(explain_block(resp["reason"], arguments), True)
         route = self.routes.get(name)
         if route is None:
             self.audit.write("result", tool=name, is_error=True, error="no downstream provides tool")
