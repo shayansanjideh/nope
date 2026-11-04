@@ -33,9 +33,10 @@ def _strings(value: Any):
             yield from _strings(v)
 
 
-def destination(arguments: Any, tool: str) -> tuple[str, str]:
-    """(short name, full description) of where a call sends data. Query strings are
-    dropped: they may hold the data itself, and this text goes back to the agent."""
+def destination(arguments: Any, tool: str) -> tuple[str, str, bool]:
+    """(short name, full description, is a local file) for where a call sends data. Query
+    strings are dropped: they may hold the data itself, and this text goes back to the
+    agent. With no URL or file path, assume the data leaves."""
     hosts: dict[str, str] = {}
     for s in _strings(arguments):
         for raw in URL_RX.findall(s):
@@ -50,12 +51,12 @@ def destination(arguments: Any, tool: str) -> tuple[str, str]:
                 hosts.setdefault(host, f"{u.scheme}://{host}{u.path}")
     if hosts:
         names = list(hosts)[:3]
-        return ", ".join(names), ", ".join(hosts[n] for n in names)
+        return ", ".join(names), ", ".join(hosts[n] for n in names), False
     if isinstance(arguments, dict):
         for k in PATH_KEYS:
             if isinstance(arguments.get(k), str):
-                return arguments[k], f"the file {arguments[k]}"
-    return tool, f"wherever {tool} sends it"
+                return arguments[k], arguments[k], True
+    return tool, f"wherever {tool} sends it", False
 
 
 def explain_block(reason: str, arguments: Any) -> str:
@@ -67,13 +68,15 @@ def explain_block(reason: str, arguments: Any) -> str:
     conf = CONF_RX.match(reason)
     if conf:
         tool, level, source = conf.groups()
-        short, full = destination(arguments, tool)
+        short, full, local = destination(arguments, tool)
         src = f"read by {source}" if source else "read in this session"
-        lines = [f"nope: blocked {tool}. WARNING: approving this lets {level} data ({src}) "
-                 f"leave this machine. It would go to {full}.",
+        effect = f"be written to {full}." if local else \
+            f"leave this machine. It would go to {full}."
+        verb = "write this data to" if local else "send this data to"
+        lines = [f"nope: blocked {tool}. WARNING: approving this lets {level} data ({src}) {effect}",
                  proof.group(0),
-                 f"Agent: do not ask the user to run this unless they explicitly asked to send "
-                 f"this data to {short}."]
+                 f"Agent: do not ask the user to run this unless they explicitly asked to {verb} "
+                 f"{short}."]
         lines.append(f"To allow anyway: {cmds[0]}" if len(cmds) == 1
                      else "To allow anyway, run both:\n" + "\n".join(f"  {c}" for c in cmds))
         return "\n".join(lines)
