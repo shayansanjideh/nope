@@ -19,6 +19,7 @@ INTEG_RX = re.compile(r"^nope: blocked (\S+)\. This session has read untrusted c
 PROOF_RX = re.compile(r"Proven in Lean: [^\n]*")
 APPROVE_RX = re.compile(r"nope approve --session \S+ (?:endorse|declassify \w+)")
 URL_RX = re.compile(r"""https?://[^\s'"<>`\\]+""")
+URL_KEYS = ("url", "uri", "endpoint", "host")
 PATH_KEYS = ("path", "file_path", "notebook_path", "destination")
 
 
@@ -37,8 +38,16 @@ def destination(arguments: Any, tool: str) -> tuple[str, str, bool]:
     """(short name, full description, is a local file) for where a call sends data. Query
     strings are dropped: they may hold the data itself, and this text goes back to the
     agent. With no URL or file path, assume the data leaves."""
+    # A file write's new text can mention URLs; that doesn't make them the destination.
+    # An explicit URL argument wins, so an upload of a file is still a network call.
+    named = isinstance(arguments, dict)
+    target = next((arguments[k] for k in URL_KEYS if arguments.get(k)), None) if named else None
+    if target is None and named:
+        for k in PATH_KEYS:
+            if isinstance(arguments.get(k), str):
+                return arguments[k], arguments[k], True
     hosts: dict[str, str] = {}
-    for s in _strings(arguments):
+    for s in _strings(arguments if target is None else target):
         for raw in URL_RX.findall(s):
             try:
                 u = urlsplit(raw)
@@ -52,10 +61,6 @@ def destination(arguments: Any, tool: str) -> tuple[str, str, bool]:
     if hosts:
         names = list(hosts)[:3]
         return ", ".join(names), ", ".join(hosts[n] for n in names), False
-    if isinstance(arguments, dict):
-        for k in PATH_KEYS:
-            if isinstance(arguments.get(k), str):
-                return arguments[k], arguments[k], True
     return tool, f"wherever {tool} sends it", False
 
 

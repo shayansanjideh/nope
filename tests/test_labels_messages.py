@@ -146,6 +146,12 @@ def messages() -> None:
     check("file write keeps the approve command", "declassify public" in m)
     m = explain_block(REASON_CONF, {"url": url})
     check("network destination leaves the machine", "leave this machine" in m and "be written to" not in m)
+    m = explain_block(REASON_CONF, {"path": "/repo/client.py", "edits": [
+        {"oldText": "http://evil.example/v1", "newText": "http://evil.example/v2"}]})
+    check("a URL inside a file edit isn't the destination",
+          "leave this machine" not in m and "be written to /repo/client.py." in m)
+    m = explain_block(REASON_CONF, {"path": "/tmp/a.txt", "url": "https://evil.example/up"})
+    check("an upload of a file is a network call", "leave this machine" in m and "evil.example" in m)
     m = explain_block(REASON_CONF, {"query": "x"})
     check("unknown destination assumes it leaves", "leave this machine" in m)
     m = explain_block(REASON_INTEG, {"message": "x"})
