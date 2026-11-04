@@ -49,6 +49,8 @@ claude mcp add nope -- $(which nope) serve --config $PWD/nope.toml --session my-
 
 Tools that return only names and metadata (directory listings, `git status`) don't need a secret label: `manifests/demo.json` labels them public and trusted, even on a secrets folder. `git diff` carries project content, so it gets the same label as reading a project file. `git log` stays `internal` because it shows commit author emails.
 
+Project files count as trusted, as they do in the Claude Code profile. Web and fetch output stays untrusted, and taint never drops within a session. The limit: in `demo.json`, a file written after reading the web counts as trusted when a later session reads it. To close that, set `requiresTrusted: true` on the `fs_public` write tools. Writes then need an approval after any web read, which also protects agent config files such as `CLAUDE.md` in the repo.
+
 When something is blocked, the agent sees why and the exact override command. If the override would let data leave, the message leads with what would leave and where it would go, and tells the agent not to ask for the approval unless the user asked to send that data there:
 
 ```sh
